@@ -1,7 +1,7 @@
 //! Structs and methods for Bolin & Rodhes reservoir models.
 use csv::{Writer};
 use crate::utils;
-use rand_distr::{Exp, Distribution, ExpError};
+use rand_distr::{Exp, Distribution};
 use rand::{thread_rng, Rng};
 use rand::distributions::Uniform;
 use serde::{Serialize, Deserialize};
