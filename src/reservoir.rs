@@ -1,18 +1,16 @@
 //! Structs and methods for Bolin & Rodhes reservoir models.
-use csv::{Writer};
 use crate::utils;
-use rand_distr::{Exp, Distribution};
-use rand::{thread_rng, Rng};
+use csv::Writer;
 use rand::distributions::Uniform;
-use serde::{Serialize, Deserialize};
+use rand::{thread_rng, Rng};
+use rand_distr::num_traits::abs;
+use rand_distr::{Distribution, Exp};
+use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io;
 use std::ops::Range;
-use rand_distr::num_traits::abs;
-use rayon::prelude::*;
 use std::time::{Duration, SystemTime};
-
-
 
 /// Holder struct for goodness-of-fit statistics.
 #[derive(Debug, Deserialize, Serialize)]
@@ -24,14 +22,12 @@ pub struct Gof {
     n: f64,
 }
 
-
 impl Gof {
     /// Convert csv record to Gof struct.
     pub fn read(path: &str) -> Result<Vec<Gof>, ResError> {
         let mut gof = Vec::new();
         let var = File::open(path)?;
-        let mut rdr = csv::Reader::from_reader(
-            var);
+        let mut rdr = csv::Reader::from_reader(var);
         for result in rdr.records() {
             let row = result?;
             let row: Gof = row.deserialize(None)?;
@@ -59,7 +55,6 @@ pub struct Sample {
     pub facies: String,
 }
 
-
 /// Struct for recording reservoir characteristics.
 #[derive(Debug, Clone)]
 pub struct Reservoir {
@@ -83,7 +78,10 @@ impl std::fmt::Display for ResError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             ResError::CsvError => write!(f, "Could not serialize/deserialize csv file."),
-            ResError::ExpError => write!(f, "Could not create exponential distribution from rate provided."),
+            ResError::ExpError => write!(
+                f,
+                "Could not create exponential distribution from rate provided."
+            ),
             ResError::IoError => write!(f, "Could not read file from path provided."),
         }
     }
@@ -101,7 +99,6 @@ impl From<rand_distr::ExpError> for ResError {
     }
 }
 
-
 impl From<std::io::Error> for ResError {
     fn from(_: std::io::Error) -> Self {
         ResError::IoError
@@ -109,15 +106,24 @@ impl From<std::io::Error> for ResError {
 }
 
 impl Reservoir {
-
-    pub fn fit_range(&self, period: &f64, boot: usize, bat: usize, dur: u64, input: Range<f64>, output: Range<f64>, obs: &Vec<f64>, title: &str) -> (){
-        let dur = Duration::new(60*60*dur, 0);
+    pub fn fit_range(
+        &self,
+        period: &f64,
+        boot: usize,
+        bat: usize,
+        dur: u64,
+        input: Range<f64>,
+        output: Range<f64>,
+        obs: &[f64],
+        title: &str,
+    ) {
+        let dur = Duration::new(60 * 60 * dur, 0);
         let now = SystemTime::now();
         let mut rec = Vec::new();
         let exists = std::path::Path::new(title).exists();
         match exists {
             true => {
-                let mut gof: Vec<Gof>  = Gof::read(title).unwrap();
+                let mut gof: Vec<Gof> = Gof::read(title).unwrap();
                 rec.append(&mut gof);
             }
             false => {}
@@ -128,7 +134,6 @@ impl Reservoir {
                 rec.append(&mut new);
             }
             Gof::record(&mut rec, title).unwrap();
-
         }
     }
 
@@ -155,32 +160,51 @@ impl Reservoir {
     /// // by running 1000 simulations for 30000 years for each pair
     /// let gofs = debris_flows.fit_rng(&30000.0, 1000, 10, 0.01..1.0, 0.01..1.0, &df);
     /// ```
-    pub fn fit_rng(&self, period: &f64, boot: usize, bat: usize, input: Range<f64>, output: Range<f64>, obs: &Vec<f64>) -> Vec<Gof> {
+    pub fn fit_rng(
+        &self,
+        period: &f64,
+        boot: usize,
+        bat: usize,
+        input: Range<f64>,
+        output: Range<f64>,
+        obs: &[f64],
+    ) -> Vec<Gof> {
         let mut roll = thread_rng();
         let mut inputs = Vec::with_capacity(bat);
         let mut outputs = Vec::with_capacity(bat);
         let mut fits = Vec::with_capacity(bat);
         for i in 0..bat {
             inputs.push(Uniform::from(input.clone()).sample(&mut roll));
-            outputs.push(Uniform::from(output.clone().start.max(inputs[i] * 0.975)..output.clone().end.min(inputs[i] * 1.0125)).sample(&mut roll));
-            fits.push(self.clone().input(&inputs[i]).unwrap().output(&outputs[i]).unwrap());
+            outputs.push(
+                Uniform::from(
+                    output.clone().start.max(inputs[i] * 0.975)
+                        ..output.clone().end.min(inputs[i] * 1.0125),
+                )
+                .sample(&mut roll),
+            );
+            fits.push(
+                self.clone()
+                    .input(&inputs[i])
+                    .unwrap()
+                    .output(&outputs[i])
+                    .unwrap(),
+            );
         }
-        let gof: Vec<(f64, f64, f64)> = fits.par_iter().map(|x| x.fit_rate(period, &obs, boot)).collect();
+        let gof: Vec<(f64, f64, f64)> = fits
+            .par_iter()
+            .map(|x| x.fit_rate(period, &obs, boot))
+            .collect();
         let mut gofs = Vec::with_capacity(bat);
         for i in 0..bat {
-            gofs.push(
-                Gof {
-                    input: inputs[i],
-                    output: outputs[i],
-                    ks: gof[i].0,
-                    kp: gof[i].1,
-                    n: gof[i].2,
-                }
-            )
+            gofs.push(Gof {
+                input: inputs[i],
+                output: outputs[i],
+                ks: gof[i].0,
+                kp: gof[i].1,
+                n: gof[i].2,
+            })
         }
         gofs
-
-
     }
 
     /// Runs `boot` number of simulations of length `period` on a reservoir.
@@ -209,21 +233,37 @@ impl Reservoir {
     /// println!("Kuiper fit is {}.", kp);
     ///
     /// ```
-    pub fn fit_rate(&self, period: &f64, other: &Vec<f64>, boot: usize) -> (f64, f64, f64) {
+    pub fn fit_rate(&self, period: &f64, other: &[f64], boot: usize) -> (f64, f64, f64) {
         let mut res: Vec<Reservoir> = Vec::with_capacity(boot);
         for _ in 0..boot {
             res.push(self.clone());
         }
-        res = res.par_iter().cloned().map(|x| x.sim(period).unwrap()).collect();
+        res = res
+            .par_iter()
+            .cloned()
+            .map(|x| x.sim(period).unwrap())
+            .collect();
         let fits: Vec<(f64, f64)> = res.par_iter().cloned().map(|x| x.gof(other)).collect();
-        let kss: Vec<f64> = fits.clone().par_iter().map(|x| x.0).collect();
-        let kps: Vec<f64> = fits.clone().par_iter().map(|x| x.1).collect();
-        let ns: Vec<f64> = res.clone().iter().map(|x| x.mass.len() as f64 / other.len() as f64).collect();
+        let kss: Vec<f64> = fits.par_iter().map(|x| x.0).collect();
+        let kps: Vec<f64> = fits.par_iter().map(|x| x.1).collect();
+        let ns: Vec<f64> = res
+            .iter()
+            .map(|x| x.mass.len() as f64 / other.len() as f64)
+            .collect();
 
         (utils::mean(&kss), utils::median(&kps), utils::mean(&ns))
     }
 
-    pub fn fit_steady(&self, period: &f64, boot: usize, bat: usize, dur: u64, rate: Range<f64>, obs: &Vec<f64>, title: &str) -> () {
+    pub fn fit_steady(
+        &self,
+        period: &f64,
+        boot: usize,
+        bat: usize,
+        dur: u64,
+        rate: Range<f64>,
+        obs: &[f64],
+        title: &str,
+    ) {
         let dur = Duration::new(60 * 60 * dur, 0);
         let now = SystemTime::now();
         let mut rec = Vec::new();
@@ -270,9 +310,9 @@ impl Reservoir {
     /// println!("Kuiper fit is {}.", kp);
     ///
     /// ```
-    pub fn gof(&self, other: &Vec<f64>) -> (f64, f64) {
+    pub fn gof(&self, other: &[f64]) -> (f64, f64) {
         let mut x = self.mass.clone();
-        let mut y = other.clone();
+        let mut y = other.to_vec();
         let lnx = x.len() as f64;
         let lny = y.len() as f64;
         let xo = x.clone();
@@ -295,7 +335,6 @@ impl Reservoir {
         (ks, kp)
     }
 
-
     /// Inherited age refers to age of charcoal upon entering the reservoir.
     /// Multiple samples of charcoal from a single deposit produces a vector of inherited ages,
     /// represented by the mean expected age of each charcoal sample in a f64 vector.
@@ -315,8 +354,8 @@ impl Reservoir {
     ///
     /// let res = Reservoir::new().inherit(&ia);
     /// ```
-    pub fn inherit(mut self, ages: &Vec<f64>) -> Self {
-        self.inherit = Some(ages.clone());
+    pub fn inherit(mut self, ages: &[f64]) -> Self {
+        self.inherit = Some(ages.to_vec());
         self
     }
 
@@ -334,7 +373,6 @@ impl Reservoir {
         self.input = Some(rate);
         Ok(self)
     }
-
 
     /// Create reservoirs using a builder pattern.  Calling new() creates an empty reservoir.
     /// Use the [input](#method.input) and [output](#method.output) methods to set rates, which start at None.
@@ -394,32 +432,30 @@ impl Reservoir {
         let mut rng = thread_rng();
         let mut om = 0f64;
         let mut im = 0f64;
-        let mut mass = Vec::new();  // time of arrivals in reservoir
-        // let mut flux = Vec::new();  //
+        let mut mass = Vec::new(); // time of arrivals in reservoir
+                                   // let mut flux = Vec::new();  //
 
         while om < *period {
             // Generate a time for removal
             match self.output {
-                Some(x) => om = om + x.sample(&mut rand::thread_rng()) as f64,
+                Some(x) => om += x.sample(&mut rand::thread_rng()) as f64,
+                // TODO: Implement zero rates for input and output
                 None => continue,
             }
 
             while im < om {
                 // Generate inputs until time for removal
-                match self.input {
-                    Some(x) => {
-                        im = im + x.sample(&mut rand::thread_rng()) as f64;
-                        mass.push(im);
-                    },
-                    None => { },
+                if let Some(x) = self.input {
+                    im += x.sample(&mut rand::thread_rng()) as f64;
+                    mass.push(im);
                 }
             }
 
-            if mass.len() > 0 {
+            if !mass.is_empty() {
                 // If there are inputs to remove
                 let mvec: Vec<f64> = mass.par_iter().cloned().filter(|x| x <= &om).collect();
                 // Only remove inputs younger than the output time
-                if mvec.len() > 0 {
+                if !mvec.is_empty() {
                     let rm = Uniform::from(0..mvec.len()).sample(&mut rng);
                     // flux.push(mass[rm]);
                     mass.remove(rm);
@@ -427,59 +463,63 @@ impl Reservoir {
             }
         }
 
-
         mass = mass.par_iter().map(|x| period - x).collect();
         // flux = flux.par_iter().map(|x| period - x).collect();
-        match self.inherit.clone() {
-            Some(x) => {
-                let ln = x.len();
-                mass = mass.iter().map(|z| z + x[Uniform::from(0..ln).sample(&mut rng)]).collect();
-                // flux = flux.iter().map(|z| z + x[Uniform::from(0..ln).sample(&mut rng)]).collect();
-            },
-            None => {},
+        if let Some(x) = self.inherit.clone() {
+            let ln = x.len();
+            mass = mass
+                .iter()
+                .map(|z| z + x[Uniform::from(0..ln).sample(&mut rng)])
+                .collect();
+            // flux = flux.iter().map(|z| z + x[Uniform::from(0..ln).sample(&mut rng)]).collect();
         }
-
 
         self.mass = mass;
         // self.flux = flux;
         Ok(self)
     }
 
-
-
     pub fn stereotype(&self, period: &f64, boot: usize, bins: usize) -> Vec<f64> {
         let mut res: Vec<Reservoir> = Vec::with_capacity(boot);
-        for _ in 0..boot {  // make boot number copies of reservoir
+        for _ in 0..boot {
+            // make boot number copies of reservoir
             res.push(self.clone());
         }
-        res = res.par_iter().cloned().map(|x| x.sim(period).unwrap()).collect();  // simulate accumulation record for each copy
-        let mut ns: Vec<f64> = res.par_iter().cloned().map(|x| x.mass.len() as f64).collect();  // number of deposits in reservoir
+        res = res
+            .par_iter()
+            .cloned()
+            .map(|x| x.sim(period).unwrap())
+            .collect(); // simulate accumulation record for each copy
+        let mut ns: Vec<f64> = res
+            .par_iter()
+            .cloned()
+            .map(|x| x.mass.len() as f64)
+            .collect(); // number of deposits in reservoir
         let mid_n = utils::median(&ns); // median number of deposits
         ns = ns.iter().map(|x| abs((x / mid_n) - 1.0)).collect(); // distance from median length
-        // collect reservoir masses into single vector and calculate the cdf
-        let mut rec = Vec::new();  // vector of mass
+                                                                  // collect reservoir masses into single vector and calculate the cdf
+        let mut rec = Vec::new(); // vector of mass
         for r in res.clone() {
             rec.append(&mut r.mass.clone()); // add each run to make one long vector
         }
-        let cdf = utils::cdf_bin(&rec, bins);  // subsample vector to length bins
+        let cdf = utils::cdf_bin(&rec, bins); // subsample vector to length bins
 
         // TODO:  parallelize
-        let gof: Vec<(f64, f64)> = res.par_iter().cloned().map(|x| x.gof(&cdf)).collect();  // ks and kp values
+        let gof: Vec<(f64, f64)> = res.par_iter().cloned().map(|x| x.gof(&cdf)).collect(); // ks and kp values
         let ks: Vec<f64> = gof.par_iter().cloned().map(|x| x.0).collect(); // clip to just ks values
         let mut least = 1.0; // test for lowest fit (set to high value)
-        let mut low = Reservoir::new();  // initialize variable to hold lowest fit
+        let mut low = Reservoir::new(); // initialize variable to hold lowest fit
         for (i, val) in ns.iter().enumerate() {
-            let loss = ks[i] + val;  // loss function
-            if loss < least { // if lowest value
-                low = res[i].clone();  // copy to low
+            let loss = ks[i] + val; // loss function
+            if loss < least {
+                // if lowest value
+                low = res[i].clone(); // copy to low
                 least = loss; // set least to new low value
             }
         }
 
         low.mass
     }
-
-
 
     /// Randomly selects a rate from ranges `rate` for a steady state reservoir,
     /// and simulates `boot` number of accumulation records
@@ -506,33 +546,50 @@ impl Reservoir {
     /// // by running 1000 simulations for 30000 years for each pair
     /// let gofs = debris_flows.steady(&30000.0, 1000, 10, 0.01..1.0, &df);
     /// ```
-    pub fn steady(&self, period: &f64, boot: usize, bat: usize, rate: Range<f64>, obs: &Vec<f64>) -> Vec<Gof> {
+    pub fn steady(
+        &self,
+        period: &f64,
+        boot: usize,
+        bat: usize,
+        rate: Range<f64>,
+        obs: &[f64],
+    ) -> Vec<Gof> {
         let mut roll = thread_rng();
         let mut rates = Vec::with_capacity(bat);
         let mut fits = Vec::with_capacity(bat);
         for i in 0..bat {
             rates.push(Uniform::from(rate.clone()).sample(&mut roll));
-            fits.push(self.clone().input(&rates[i]).unwrap().output(&rates[i]).unwrap());
+            fits.push(
+                self.clone()
+                    .input(&rates[i])
+                    .unwrap()
+                    .output(&rates[i])
+                    .unwrap(),
+            );
         }
-        let gof: Vec<(f64, f64, f64)> = fits.par_iter().map(|x| x.fit_rate(period, &obs, boot)).collect();
+        let gof: Vec<(f64, f64, f64)> = fits
+            .par_iter()
+            .map(|x| x.fit_rate(period, &obs, boot))
+            .collect();
         let mut gofs = Vec::with_capacity(bat);
         for i in 0..bat {
-            gofs.push(
-                Gof {
-                    input: rates[i],
-                    output: rates[i],
-                    ks: gof[i].0,
-                    kp: gof[i].1,
-                    n: gof[i].2,
-                }
-            )
+            gofs.push(Gof {
+                input: rates[i],
+                output: rates[i],
+                ks: gof[i].0,
+                kp: gof[i].1,
+                n: gof[i].2,
+            })
         }
         gofs
     }
-
-
 }
 
+impl Default for Reservoir {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl Sample {
     /// Converts a csv file of charcoal ages into a Sample struct.
@@ -547,5 +604,4 @@ impl Sample {
         }
         Ok(record)
     }
-
 }

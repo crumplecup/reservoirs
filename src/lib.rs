@@ -22,7 +22,7 @@
 * To use reservoirs, add it to your `Cargo.toml`
 * ```toml
 * [dependencies]
-* reservoirs = "^0.1.1"
+* reservoirs = "^0.1.2"
 * ```
 *
 *  - Load the crate prelude in the preamble of your `main.rs`.
@@ -36,16 +36,23 @@
 *     let iat = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/iat.csv")?;
 *
 *     // subset mean ages of debris flows
-*     let df: Vec<f64> = dep.iter().filter(|x| x.facies == "DF").map(|x| x.age).collect();
+*     let df: Vec<f64> = dep.iter()
+*         .filter(|x| x.facies == "DF")
+*         .map(|x| x.age)
+*         .collect();
 *     // subset inherited ages
-*     let ia: Vec<f64> = iat.iter().map(|x| x.age).collect();
+*     let ia: Vec<f64> = iat.iter()
+*         .map(|x| x.age)
+*         .collect();
 *
 *     // create steady state reservoir with charcoal inherited ages
-*     let res = Reservoir::new().input(&0.78)?.output(&0.78)?.inherit(&ia);
+*     let res = Reservoir::new().input(&0.78)?
+*         .output(&0.78)?
+*         .inherit(&ia);
 *     // sample a stereotypical record from 1000 runs of 30000 years
 *     let eg = res.stereotype(&30000.0, 1000, 200);
 *     // compare the CDF of the synthetic example to the observed debris-flow deposit record
-*     plot::comp_cdf(eg, df, "examples/df_cdf.png");
+*     plot::comp_cdf(&eg, &df, "examples/df_cdf.png");
 *
 *     Ok(())
 * }
@@ -81,14 +88,14 @@
 */
 
 #![warn(missing_docs)]
+pub mod plot;
 pub mod reservoir;
 pub mod utils;
-pub mod plot;
 
 pub mod prelude {
     // pub use crate::utils;
-    pub use crate::reservoir::{Reservoir, ResError, Sample};
     pub use crate::plot;
+    pub use crate::reservoir::{ResError, Reservoir, Sample};
 }
 
 #[cfg(test)]

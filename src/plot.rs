@@ -1,7 +1,7 @@
 use crate::utils;
 use plotters::prelude::*;
 
-pub fn comp_cdf(a: Vec<f64>, b: Vec<f64>, title: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn comp_cdf(a: &[f64], b: &[f64], title: &str) -> Result<(), Box<dyn std::error::Error>> {
     let a = utils::cdf(a);
     let b = utils::cdf(b);
     let mut ab = a.clone();
@@ -18,7 +18,7 @@ pub fn comp_cdf(a: Vec<f64>, b: Vec<f64>, title: &str) -> Result<(), Box<dyn std
     // construct a chart context
     let mut chart = ChartBuilder::on(&root)
         // Set the caption of the chart
-//        .caption("Title", ("sans-serif", 40).into_font())
+        //        .caption("Title", ("sans-serif", 40).into_font())
         // Set the size of the label region
         .x_label_area_size(40)
         .y_label_area_size(60)
@@ -39,34 +39,26 @@ pub fn comp_cdf(a: Vec<f64>, b: Vec<f64>, title: &str) -> Result<(), Box<dyn std
         .draw()?;
 
     // And we can draw something in the drawing area
-    chart.draw_series(LineSeries::new(a.clone(), &BLACK))?
+    chart
+        .draw_series(LineSeries::new(a.clone(), &BLACK))?
         .label("synthetic")
         .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &BLUE));
     // Similarly, we can draw point series
-    chart.draw_series(PointSeries::of_element(
-        a,
-        2,
-        &BLUE,
-        &|c, s, st| {
-            return EmptyElement::at(c)    // We want to construct a composed element on-the-fly
+    chart.draw_series(PointSeries::of_element(a, 2, &BLUE, &|c, s, st| {
+        return EmptyElement::at(c)    // We want to construct a composed element on-the-fly
                 + Circle::new((0, 0), s, st.filled()); // At this point, the new pixel coordinate is established
-//                + Text::new(format!("{:?}", c), (10, 0), ("sans-serif", 10).into_font());
-        },
-    ))?;
+                                                       //                + Text::new(format!("{:?}", c), (10, 0), ("sans-serif", 10).into_font());
+    }))?;
 
-    chart.draw_series(LineSeries::new(b.clone(), &BLACK))?
+    chart
+        .draw_series(LineSeries::new(b.clone(), &BLACK))?
         .label("observed")
         .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], &GREEN));
-    chart.draw_series(PointSeries::of_element(
-        b.clone(),
-        2,
-        &GREEN,
-        &|c, s, st| {
-            return EmptyElement::at(c)    // We want to construct a composed element on-the-fly
+    chart.draw_series(PointSeries::of_element(b, 2, &GREEN, &|c, s, st| {
+        return EmptyElement::at(c)    // We want to construct a composed element on-the-fly
                 + Circle::new((0, 0), s, st.filled()); // At this point, the new pixel coordinate is established
-//                + Text::new(format!("{:?}", c), (10, 0), ("sans-serif", 10).into_font());
-        },
-    ))?;
+                                                       //                + Text::new(format!("{:?}", c), (10, 0), ("sans-serif", 10).into_font());
+    }))?;
     chart
         .configure_series_labels()
         .background_style(WHITE.filled())
