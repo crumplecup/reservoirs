@@ -47,7 +47,7 @@
 *     Ok(())
 * }
 * ```
-* ![]("https://crumplecup.github.io/reservoirs/examples/df_cdf.png")
+* ![](examples/df_cdf.png)
 *
 *
 *
