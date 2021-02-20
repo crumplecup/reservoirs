@@ -32,18 +32,21 @@ against an observed record, and stream bank charcoal makes a handy foil.
 use reservoirs::prelude::*;
 
 fn main() -> Result<(), ResError>{
-// mean expected deposit age and inherited age by facies
-    let dep = Sample::read("https://crumplecup.github.io/reservoirs/examples/dep.csv")?;
-    let iat = Sample::read("https://crumplecup.github.io/reservoirs/examples/iat.csv")?;
+    // mean expected deposit age and inherited age by facies
+    let dep = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/dep.csv")?;
+    let iat = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/iat.csv")?;
 
-// subset mean ages of debris flows
+    // subset mean ages of debris flows
     let df: Vec<f64> = dep.iter().filter(|x| x.facies == "DF").map(|x| x.age).collect();
-// subset inherited ages
+    // subset inherited ages
     let ia: Vec<f64> = iat.iter().map(|x| x.age).collect();
-    
+
+    // create steady state reservoir with charcoal inherited ages
     let res = Reservoir::new().input(&0.78)?.output(&0.78)?.inherit(&ia);
+    // sample a stereotypical record from 1000 runs of 30000 years
     let eg = res.stereotype(&30000.0, 1000, 200);
-    plot::comp_cdf(eg, df, "https://crumplecup.github.io/reservoirs/examples/df_cdf.png");
+    // compare the CDF of the synthetic example to the observed debris-flow deposit record
+    plot::comp_cdf(eg, df, "examples/df_cdf.png");
 
     Ok(())
 }
