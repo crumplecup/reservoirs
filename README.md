@@ -33,8 +33,8 @@ use reservoirs::prelude::*;
 
 fn main() -> Result<(), ResError>{
 // mean expected deposit age and inherited age by facies
-    let dep = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/dep.csv")?;
-    let iat = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/iat.csv")?;
+    let dep = Sample::read("https://crumplecup.github.io/reservoirs/examples/dep.csv")?;
+    let iat = Sample::read("https://crumplecup.github.io/reservoirs/examples/iat.csv")?;
 
 // subset mean ages of debris flows
     let df: Vec<f64> = dep.iter().filter(|x| x.facies == "DF").map(|x| x.age).collect();
@@ -43,9 +43,10 @@ fn main() -> Result<(), ResError>{
     
     let res = Reservoir::new().input(&0.78)?.output(&0.78)?.inherit(&ia);
     let eg = res.stereotype(&30000.0, 1000, 200);
-    plot::comp_cdf(eg, df, "https://github.com/crumplecup/reservoirs/blob/master/examples/df_cdf.png");
+    plot::comp_cdf(eg, df, "https://crumplecup.github.io/reservoirs/examples/df_cdf.png");
 
     Ok(())
 }
 
 ```
+![]("https://crumplecup.github.io/reservoirs/examples/df_cdf.png")
