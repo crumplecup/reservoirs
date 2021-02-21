@@ -583,6 +583,56 @@ impl Reservoir {
         }
         gofs
     }
+
+    /// Estimate transit time of mass through a reservoir.
+    ///  - `period` is period of time in years to simulate accumulation in the reservoir.
+    ///  - `boot` is the number of simulations to run for estimation.
+    ///  - Returns a result containing a plotters Quartile struct or a ResError.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use reservoirs::prelude::*;
+    ///
+    /// let period: f64 = 30000.0;  // length of time to simulate accumulation in the reservoir in years
+    /// let boot: usize = 1000; // number of simulations to run for estimation
+    /// let df_rt: f64 = 0.78; // rate for steady state debris-flow accumulation
+    /// let ff_rt: f64 = 0.63; // rate for steady state fluvial fines accumulation
+    /// let fg_rt: f64 = 0.58; // rate for steady state fluvial gravels accumulation
+    ///
+    /// // to estimate transit times, omit inherit age from charcoal
+    /// let debris_flows = Reservoir::new().input(&df_rt)?.output(&df_rt)?;
+    /// let fines = Reservoir::new().input(&ff_rt)?.output(&ff_rt)?;
+    /// let gravels = Reservoir::new().input(&fg_rt)?.output(&fg_rt)?;
+    ///
+    /// // quartiles of transit times
+    /// let df = debris_flows.transit_times(&period, boot)?;
+    /// let ff = fines.transit_times(&period, boot)?;
+    /// let fg = gravels.transit_times(&period, boot)?;
+    ///
+    /// plot::whisker_for_facies(&df, &ff, &fg, "examples/transit_times.png")?
+    /// ```
+    pub fn transit_times(
+        &self,
+        period: &f64,
+        boot: usize,
+    ) -> Result<plotters::data::Quartiles, ResError> {
+        let mut res = Vec::with_capacity(boot);
+        for _ in 0..boot {
+            res.push(self.clone());
+        }
+        res = res
+            .iter()
+            .cloned()
+            .map(|x| x.sim(period).unwrap())
+            .collect();
+        let mut rec = Vec::new();
+        for r in res {
+            let mut mass = r.mass.clone();
+            rec.append(&mut mass);
+        }
+        Ok(plotters::data::Quartiles::new(&rec))
+    }
 }
 
 impl Default for Reservoir {

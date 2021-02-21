@@ -22,7 +22,7 @@
 * To use reservoirs, add it to your `Cargo.toml`
 * ```toml
 * [dependencies]
-* reservoirs = "^0.1.3"
+* reservoirs = "^0.1.4"
 * ```
 *
 *  - Load the crate prelude in the preamble of your `main.rs`.
