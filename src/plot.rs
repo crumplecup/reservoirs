@@ -65,3 +65,55 @@ pub fn comp_cdf(a: &[f64], b: &[f64], title: &str) -> Result<(), Box<dyn std::er
         .draw()?;
     Ok(())
 }
+
+pub fn whisker_for_facies(
+    df: &plotters::data::Quartiles,
+    ff: &plotters::data::Quartiles,
+    fg: &plotters::data::Quartiles,
+    title: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let values_range = plotters::data::fitting_range(
+        df.values()
+            .iter()
+            .chain(ff.values().iter().chain(fg.values().iter())),
+    );
+
+    let facies_axis = ["debris flows", "fines", "gravels"];
+    let root = BitMapBackend::new(title, (640, 480)).into_drawing_area();
+    root.fill(&WHITE)?;
+    root.margin(10, 10, 10, 10);
+    // construct a chart context
+    let mut chart = ChartBuilder::on(&root)
+        // Set the caption of the chart
+        //        .caption("Title", ("sans-serif", 40).into_font())
+        // Set the size of the label region
+        .x_label_area_size(40)
+        .y_label_area_size(60)
+        // Finally attach a coordinate on the drawing area and make a chart context
+        .build_cartesian_2d(facies_axis[..].into_segmented(), values_range)?;
+
+    // Then we can draw a mesh
+    chart
+        .configure_mesh()
+        // We can customize the maximum number of labels allowed for each axis
+        .y_labels(5)
+        // We can also change the format of the label text
+        .y_label_formatter(&|x| format!("{:.2}", x))
+        .x_desc("Facies")
+        .y_desc("Transit Time")
+        .draw()?;
+
+    // And we can draw something in the drawing area
+
+    chart.draw_series(vec![
+        Boxplot::new_vertical(SegmentValue::CenterOf(&"debris flows"), &df),
+        Boxplot::new_vertical(SegmentValue::CenterOf(&"fines"), &ff),
+        Boxplot::new_vertical(SegmentValue::CenterOf(&"gravels"), &fg),
+    ])?;
+
+    chart
+        .configure_series_labels()
+        .background_style(WHITE.filled())
+        .draw()?;
+    Ok(())
+}
