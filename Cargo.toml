@@ -1,6 +1,6 @@
 [package]
 name = "reservoirs"
-version = "0.1.4"
+version = "0.1.5"
 authors = ["crumplecup <erik.w.rose@gmail.com>"]
 edition = "2018"
 description = "A library for simulating Bolin & Rodhes reservoir models."
@@ -16,3 +16,4 @@ rand = "0.8.3"
 rand_distr = "0.4.0"
 rayon = "1.5.0"
 serde = { version = "1.0.123", features = ["derive"] }
+

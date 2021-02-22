@@ -21,7 +21,7 @@ of academic transparency.
 To use reservoirs, add it to your `Cargo.toml`
 ```toml
 [dependencies]
-reservoirs = "^0.1.4"
+reservoirs = "^0.1.5"
 ```
 
 Let's load the stream bank charcoal data from the Oregon Coast that I use 

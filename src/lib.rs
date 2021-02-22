@@ -22,7 +22,7 @@
 * To use reservoirs, add it to your `Cargo.toml`
 * ```toml
 * [dependencies]
-* reservoirs = "^0.1.4"
+* reservoirs = "^0.1.5"
 * ```
 *
 *  - Load the crate prelude in the preamble of your `main.rs`.
@@ -86,16 +86,20 @@
 *
 * ```
 */
-
+#![feature(intra_doc_pointers)]
 #![warn(missing_docs)]
+/// Plotting functions for reservoir models.
 pub mod plot;
+/// Structs and methods related to simulating reservoir models.
 pub mod reservoir;
+/// Basic utility functions, largely reinventing the wheel.
 pub mod utils;
 
+/// Standard import of useful features of reservoirs.
 pub mod prelude {
-    // pub use crate::utils;
     pub use crate::plot;
-    pub use crate::reservoir::{ResError, Reservoir, Sample};
+    pub use crate::reservoir::{Model, ResError, Reservoir, Sample};
+    pub use crate::utils;
 }
 
 #[cfg(test)]
