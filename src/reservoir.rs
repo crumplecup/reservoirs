@@ -260,8 +260,8 @@ impl Model {
     /// use reservoirs::prelude::*;
     ///
     /// let period: f64 = 30000.0;  // length of time to simulate accumulation in the reservoir in years
-    /// let boot: usize = 1000; // number of simulations to run for estimation
-    /// let df_rt: f64 = 0.78; // rate for steady state debris-flow accumulation
+    /// let runs: usize = 1000; // number of simulations to run for estimation
+    /// let df_rt: f64 = 0.72; // rate for steady state debris-flow accumulation
     /// let ff_rt: f64 = 0.63; // rate for steady state fluvial fines accumulation
     /// let fg_rt: f64 = 0.58; // rate for steady state fluvial gravels accumulation
     ///
@@ -270,9 +270,9 @@ impl Model {
     /// let fines = Reservoir::new().input(&ff_rt)?.output(&ff_rt)?;
     /// let gravels = Reservoir::new().input(&fg_rt)?.output(&fg_rt)?;
     ///
-    /// let df_mod = Model::new(debris_flows).period(&30000.0).runs(100);
-    /// let ff_mod = Model::new(fines).period(&30000.0).runs(100);
-    /// let fg_mod = Model::new(gravels).period(&30000.0).runs(100);
+    /// let df_mod = Model::new(debris_flows).period(&period).runs(runs);
+    /// let ff_mod = Model::new(fines).period(&period).runs(runs);
+    /// let fg_mod = Model::new(gravels).period(&period).runs(runs);
     ///
     /// // vector of transit times
     /// let df_t = df_mod.transit_times();
@@ -413,7 +413,7 @@ impl Reservoir {
         output: std::ops::Range<f64>,
         obs: &[f64],
     ) -> Vec<Gof> {
-        let mut roll = rand::thread_rng();
+        let mut roll: rand::rngs::StdRng = rand::SeedableRng::seed_from_u64(10101);
         let mut inputs = Vec::with_capacity(bat);
         let mut outputs = Vec::with_capacity(bat);
         let mut fits = Vec::with_capacity(bat);
@@ -646,7 +646,7 @@ impl Reservoir {
     ///
     /// ```
     pub fn sim(mut self, period: &f64) -> Result<Self, ResError> {
-        let mut rng = rand::thread_rng();
+        let mut rng: rand::rngs::StdRng = rand::SeedableRng::seed_from_u64(10101);
         let mut om = 0f64;
         let mut im = 0f64;
         let mut mass = Vec::new(); // time of arrivals in reservoir
@@ -655,7 +655,7 @@ impl Reservoir {
         while om < *period {
             // Generate a time for removal
             match self.output {
-                Some(x) => om += x.sample(&mut rand::thread_rng()) as f64,
+                Some(x) => om += x.sample(&mut rng) as f64,
                 // TODO: Implement zero rates for input and output
                 None => continue,
             }
@@ -663,7 +663,7 @@ impl Reservoir {
             while im < om {
                 // Generate inputs until time for removal
                 if let Some(x) = self.input {
-                    im += x.sample(&mut rand::thread_rng()) as f64;
+                    im += x.sample(&mut rng) as f64;
                     mass.push(im);
                 }
             }
@@ -815,7 +815,7 @@ impl Reservoir {
         rate: std::ops::Range<f64>,
         obs: &[f64],
     ) -> Vec<Gof> {
-        let mut roll = rand::thread_rng();
+        let mut roll: rand::rngs::StdRng = rand::SeedableRng::seed_from_u64(10101);
         let mut rates = Vec::with_capacity(bat);
         let mut fits = Vec::with_capacity(bat);
         for i in 0..bat {

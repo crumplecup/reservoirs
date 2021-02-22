@@ -67,6 +67,40 @@ pub fn comp_cdf(a: &[f64], b: &[f64], title: &str) -> Result<(), Box<dyn std::er
     Ok(())
 }
 
+/// Scatter plot for comparing goodness-of-fit statistics from model runs.
+pub fn scatter(x: &[f64], y: &[f64], title: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let xy: Vec<(f64, f64)> = x.iter().cloned().zip(y.iter().cloned()).collect();
+
+    let ymin = xy.iter().map(|xi| xi.1).fold(1.0, f64::min);
+    let ymax = xy.iter().map(|xi| xi.1).fold(0.0, f64::max);
+    let xmin = xy.iter().map(|xi| xi.0).fold(1.0, f64::min);
+    let xmax = xy.iter().map(|xi| xi.0).fold(0.0, f64::max);
+    let root = BitMapBackend::new(title, (640, 480)).into_drawing_area();
+    root.fill(&WHITE)?;
+    root.margin(10, 10, 10, 10);
+    let mut chart = ChartBuilder::on(&root)
+        .x_label_area_size(40)
+        .y_label_area_size(60)
+        .build_cartesian_2d(xmin..xmax, ymin..ymax)?;
+
+    chart
+        .configure_mesh()
+        .x_labels(5)
+        .y_labels(5)
+        .y_label_formatter(&|x| format!("{:.2}", x))
+        .x_label_formatter(&|x| format!("{:.2}", x))
+        .x_desc("Rate")
+        .y_desc("Fit")
+        .draw()?;
+    chart.draw_series(xy.iter().map(|x| Circle::new((x.0, x.1), 2, BLUE.filled())))?;
+
+    chart
+        .configure_series_labels()
+        .background_style(WHITE.filled())
+        .draw()?;
+    Ok(())
+}
+
 /// Experimental box-and-whisker plot of transit times.
 pub fn whisker_for_facies(
     df: &plotters::data::Quartiles,
