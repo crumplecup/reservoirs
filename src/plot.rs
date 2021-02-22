@@ -1,6 +1,7 @@
 use crate::utils;
 use plotters::prelude::*;
 
+/// Compare the CDF of two accumulation records.
 pub fn comp_cdf(a: &[f64], b: &[f64], title: &str) -> Result<(), Box<dyn std::error::Error>> {
     let a = utils::cdf(a);
     let b = utils::cdf(b);
@@ -66,6 +67,7 @@ pub fn comp_cdf(a: &[f64], b: &[f64], title: &str) -> Result<(), Box<dyn std::er
     Ok(())
 }
 
+/// Experimental box-and-whisker plot of transit times.
 pub fn whisker_for_facies(
     df: &plotters::data::Quartiles,
     ff: &plotters::data::Quartiles,
