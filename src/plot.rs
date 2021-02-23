@@ -94,10 +94,6 @@ pub fn scatter(x: &[f64], y: &[f64], title: &str) -> Result<(), Box<dyn std::err
         .draw()?;
     chart.draw_series(xy.iter().map(|x| Circle::new((x.0, x.1), 2, BLUE.filled())))?;
 
-    chart
-        .configure_series_labels()
-        .background_style(WHITE.filled())
-        .draw()?;
     Ok(())
 }
 
