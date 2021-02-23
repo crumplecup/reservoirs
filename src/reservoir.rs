@@ -37,6 +37,11 @@ impl Gof {
         wtr.flush()?;
         Ok(())
     }
+
+    /// Get the values associated with fields of the struct.
+    pub fn values(&self) -> (f64, f64, f64, f64, f64) {
+        (self.input, self.output, self.ks, self.kp, self.n)
+    }
 }
 
 /// Holds model characteristics associated with a reservoir.
