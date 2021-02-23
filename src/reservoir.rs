@@ -120,7 +120,7 @@ impl Model {
     /// model.fit_range(0.01..1.0, 0.01..1.0, &df, "examples/df_fit_1k.csv");
     /// ```
     pub fn fit_range(
-        &self,
+        &mut self,
         input: std::ops::Range<f64>,
         output: std::ops::Range<f64>,
         obs: &[f64],
@@ -204,7 +204,7 @@ impl Model {
     /// // by running 1000 simulations for 30000 years for each pair
     /// model.fit_steady(0.01..1.0, &df, "examples/df_fit_1k.csv");
     /// ```
-    pub fn fit_steady(&self, rate: std::ops::Range<f64>, obs: &[f64], title: &str) {
+    pub fn fit_steady(&mut self, rate: std::ops::Range<f64>, obs: &[f64], title: &str) {
         let dur = std::time::Duration::new(60 * 60 * self.duration, 0);
         let now = std::time::SystemTime::now();
         let mut rec = Vec::new();
@@ -339,6 +339,7 @@ pub struct Reservoir {
     output: Option<Exp<f64>>,
     flux: Vec<f64>,
     inherit: Option<Vec<f64>>,
+    range: rand::rngs::StdRng,
 }
 
 /// Custom error type for the reservoirs crate.
@@ -410,7 +411,7 @@ impl Reservoir {
     /// let gofs = debris_flows.fit_rng(&30000.0, 1000, 10, 0.01..1.0, 0.01..1.0, &df);
     /// ```
     pub fn fit_rng(
-        &self,
+        &mut self,
         period: &f64,
         boot: usize,
         bat: usize,
@@ -418,18 +419,17 @@ impl Reservoir {
         output: std::ops::Range<f64>,
         obs: &[f64],
     ) -> Vec<Gof> {
-        let mut roll: rand::rngs::StdRng = rand::SeedableRng::seed_from_u64(10101);
         let mut inputs = Vec::with_capacity(bat);
         let mut outputs = Vec::with_capacity(bat);
         let mut fits = Vec::with_capacity(bat);
         for i in 0..bat {
-            inputs.push(rand::distributions::Uniform::from(input.clone()).sample(&mut roll));
+            inputs.push(rand::distributions::Uniform::from(input.clone()).sample(&mut self.range));
             outputs.push(
                 rand::distributions::Uniform::from(
                     output.clone().start.max(inputs[i] * 0.975)
                         ..output.clone().end.min(inputs[i] * 1.0125),
                 )
-                .sample(&mut roll),
+                .sample(&mut self.range),
             );
             fits.push(
                 self.clone()
@@ -612,6 +612,7 @@ impl Reservoir {
             output: None,
             flux: Vec::new(),
             inherit: None,
+            range: rand::SeedableRng::seed_from_u64(10101),
         }
     }
 
@@ -628,6 +629,20 @@ impl Reservoir {
         let rate = Exp::new(*rate)?;
         self.output = Some(rate);
         Ok(self)
+    }
+
+    /// Assign a seed to the random number generator, for reproducibility.
+    ///  - `seed` is a number to convert in an RNG seed using the rand crate.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use reservoirs::prelude::*;
+    /// res = Reservoir::new().range(10101);
+    /// ```
+    pub fn range(mut self, seed: u64) -> Self {
+        self.range = rand::SeedableRng::seed_from_u64(seed);
+        self
     }
 
     /// Workhorse function for simulating accumulation records in a reservoir.
@@ -651,7 +666,6 @@ impl Reservoir {
     ///
     /// ```
     pub fn sim(mut self, period: &f64) -> Result<Self, ResError> {
-        let mut rng: rand::rngs::StdRng = rand::SeedableRng::seed_from_u64(10101);
         let mut om = 0f64;
         let mut im = 0f64;
         let mut mass = Vec::new(); // time of arrivals in reservoir
@@ -660,7 +674,7 @@ impl Reservoir {
         while om < *period {
             // Generate a time for removal
             match self.output {
-                Some(x) => om += x.sample(&mut rng) as f64,
+                Some(x) => om += x.sample(&mut self.range) as f64,
                 // TODO: Implement zero rates for input and output
                 None => continue,
             }
@@ -668,7 +682,7 @@ impl Reservoir {
             while im < om {
                 // Generate inputs until time for removal
                 if let Some(x) = self.input {
-                    im += x.sample(&mut rng) as f64;
+                    im += x.sample(&mut self.range) as f64;
                     mass.push(im);
                 }
             }
@@ -678,7 +692,8 @@ impl Reservoir {
                 let mvec: Vec<f64> = mass.par_iter().cloned().filter(|x| x <= &om).collect();
                 // Only remove inputs younger than the output time
                 if !mvec.is_empty() {
-                    let rm = rand::distributions::Uniform::from(0..mvec.len()).sample(&mut rng);
+                    let rm =
+                        rand::distributions::Uniform::from(0..mvec.len()).sample(&mut self.range);
                     // flux.push(mass[rm]);
                     mass.remove(rm);
                 }
@@ -691,7 +706,7 @@ impl Reservoir {
             let ln = x.len();
             mass = mass
                 .iter()
-                .map(|z| z + x[rand::distributions::Uniform::from(0..ln).sample(&mut rng)])
+                .map(|z| z + x[rand::distributions::Uniform::from(0..ln).sample(&mut self.range)])
                 .collect();
             // flux = flux.iter().map(|z| z + x[Uniform::from(0..ln).sample(&mut rng)]).collect();
         }
@@ -813,18 +828,17 @@ impl Reservoir {
     /// let gofs = debris_flows.steady(&30000.0, 1000, 10, 0.01..1.0, &df);
     /// ```
     pub fn steady(
-        &self,
+        &mut self,
         period: &f64,
         boot: usize,
         bat: usize,
         rate: std::ops::Range<f64>,
         obs: &[f64],
     ) -> Vec<Gof> {
-        let mut roll: rand::rngs::StdRng = rand::SeedableRng::seed_from_u64(10101);
         let mut rates = Vec::with_capacity(bat);
         let mut fits = Vec::with_capacity(bat);
         for i in 0..bat {
-            rates.push(rand::distributions::Uniform::from(rate.clone()).sample(&mut roll));
+            rates.push(rand::distributions::Uniform::from(rate.clone()).sample(&mut self.range));
             fits.push(
                 self.clone()
                     .input(&rates[i])
