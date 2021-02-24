@@ -1,5 +1,6 @@
 //! Structs and methods for Bolin & Rodhes reservoir models.
 use crate::utils;
+use rand::SeedableRng;
 use rand_distr::{Distribution, Exp};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -45,7 +46,7 @@ impl Gof {
 }
 
 /// Holds model characteristics associated with a reservoir.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Model {
     reservoir: Reservoir,
     period: f64,
@@ -138,19 +139,171 @@ impl Model {
             false => {}
         }
         while std::time::SystemTime::now() < now + dur {
-            let mut new = self.reservoir.fit_rng(
-                &self.period,
-                self.runs,
-                self.batch,
-                input.clone(),
-                output.clone(),
-                obs,
-            );
+            let mut new = self.fit_rng(input.clone(), output.clone(), obs);
             {
                 rec.append(&mut new);
             }
             Gof::record(&mut rec, title).unwrap();
         }
+    }
+
+    /// Randomly selects rate pairs from ranges `input` and `output`, and simulates accumulation records
+    /// in batches using [fit_rate](#method.fit_rate).  Returns the selected input/output pair and the mean
+    /// goodness-of-fit statistics for each pair.  Called by [fit_range](method.fit_range).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use reservoirs::prelude::*;
+    ///
+    /// // mean expected deposit age and inherited age by facies
+    /// let dep = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/dep.csv")?;
+    /// let iat = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/iat.csv")?;
+    ///
+    /// // subset mean ages of debris flows
+    /// let df: Vec<f64> = dep.iter()
+    ///     .filter(|x| x.facies == "DF")
+    ///     .map(|x| x.age)
+    ///     .collect();
+    ///
+    /// // subset inherited ages
+    /// let ia: Vec<f64> = iat.iter()
+    ///     .map(|x| x.age)
+    ///     .collect();
+    ///
+    /// let mut debris_flows = Reservoir::new()
+    ///     .input(&0.687)?
+    ///     .output(&0.687)?
+    ///     .inherit(&ia);
+    ///
+    /// // model parameters
+    /// let batch = 10;  // fit 10 input/output pairs at a time using rayon
+    /// let period = 30000.0; // run simulations for 30000 years
+    /// let runs = 1000; // run 1000 simulated accumulations per candidate pair for goodness-of-fit
+    ///
+    /// // create reservoir model using builder pattern
+    /// let mut model = Model::new(debris_flows)
+    ///     .batch(batch)
+    ///     .period(&period)
+    ///     .runs(runs);
+    /// // fit batches of 10 randomly selected rate pairs (from range 0.01 to 1.0)
+    /// // to observed debris flows
+    /// // by running 1000 simulations for 30000 years for each pair
+    /// let gofs = model.fit_rng(0.01..1.0, 0.01..1.0, &df);
+    /// ```
+    pub fn fit_rng(
+        &mut self,
+        input: std::ops::Range<f64>,
+        output: std::ops::Range<f64>,
+        obs: &[f64],
+    ) -> Vec<Gof> {
+        let mut inputs = Vec::with_capacity(self.batch);
+        let mut outputs = Vec::with_capacity(self.batch);
+        let mut fits = Vec::with_capacity(self.batch);
+        for i in 0..self.batch {
+            inputs.push(
+                rand::distributions::Uniform::from(input.clone()).sample(&mut self.reservoir.range),
+            );
+            outputs.push(
+                rand::distributions::Uniform::from(
+                    output.clone().start.max(inputs[i] * 0.975)
+                        ..output.clone().end.min(inputs[i] * 1.0125),
+                )
+                .sample(&mut self.reservoir.range),
+            );
+            fits.push(
+                self.clone().reservoir(
+                    self.reservoir
+                        .clone()
+                        .input(&inputs[i])
+                        .unwrap()
+                        .output(&outputs[i])
+                        .unwrap(),
+                ),
+            );
+        }
+        let gof: Vec<(f64, f64, f64)> = fits.par_iter().map(|x| x.clone().fit_rate(&obs)).collect();
+        let mut gofs = Vec::with_capacity(self.batch);
+        for i in 0..self.batch {
+            gofs.push(Gof {
+                input: inputs[i],
+                output: outputs[i],
+                ks: gof[i].0,
+                kp: gof[i].1,
+                n: gof[i].2,
+            })
+        }
+        gofs
+    }
+
+    /// Runs simulations on a reservoir,
+    /// returns the mean goodness-of-fit statistics compared to accumulation record `other`.
+    /// Called by [fit_rng](#method.fit_rng) and [steady](#method.steady).  To use,
+    /// set characteristics of the reservoir and model before running.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use reservoirs::prelude::*;
+    ///
+    /// // mean expected deposit age and inherited age by facies
+    /// let dep = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/dep.csv")?;
+    /// let iat = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/iat.csv")?;
+    ///
+    /// // subset mean ages of debris flows
+    /// let df: Vec<f64> = dep.iter()
+    ///     .filter(|x| x.facies == "DF")
+    ///     .map(|x| x.age)
+    ///     .collect();
+    ///
+    /// // subset inherited ages
+    /// let ia: Vec<f64> = iat.iter()
+    ///     .map(|x| x.age)
+    ///     .collect();
+    ///
+    /// let mut debris_flows = Reservoir::new()
+    ///     .input(&0.687)?
+    ///     .output(&0.687)?
+    ///     .inherit(&ia);
+    ///
+    /// // model parameters
+    /// let period = 30000.0; // run simulations for 30000 years
+    /// let runs = 1000; // run 1000 simulated accumulations per candidate pair for goodness-of-fit
+    ///
+    /// // create reservoir model using builder pattern
+    /// let mut model = Model::new(debris_flows)
+    ///     .period(&period)
+    ///     .runs(runs);
+    /// // fit selected rate pairs
+    /// // to observed debris flows
+    /// // by running 1000 simulations for 30000 years for each pair
+    /// let (ks, kp, _) = model.fit_rate(&df);
+    ///
+    /// println!("K-S fit is {}.", ks);
+    /// println!("Kuiper fit is {}.", kp);
+    /// ```
+    pub fn fit_rate(&mut self, other: &[f64]) -> (f64, f64, f64) {
+        let mut res: Vec<Reservoir> = Vec::with_capacity(self.runs);
+        let seeder: rand::distributions::Uniform<u64> =
+            rand::distributions::Uniform::new(0, 10000000);
+        let seeds: Vec<u64> = seeder
+            .sample_iter(&mut self.reservoir.range)
+            .take(self.runs)
+            .collect();
+        for seed in seeds {
+            res.push(self.reservoir.clone().range(seed));
+        }
+        res = res
+            .par_iter()
+            .cloned()
+            .map(|x| x.sim(&self.period).unwrap())
+            .collect();
+        let fits: Vec<(f64, f64)> = res.par_iter().cloned().map(|x| x.gof(other)).collect();
+        let kss: Vec<f64> = fits.par_iter().map(|x| x.0).collect();
+        let kps: Vec<f64> = fits.par_iter().map(|x| x.1).collect();
+        let ns: Vec<f64> = res.iter().map(|x| x.mass.len() as f64).collect();
+
+        (utils::mean(&kss), utils::median(&kps), utils::mean(&ns))
     }
 
     /// Fits a range of steady state reservoirs to an observed accumulation record.
@@ -217,9 +370,7 @@ impl Model {
             false => {}
         }
         while std::time::SystemTime::now() < now + dur {
-            let mut new =
-                self.reservoir
-                    .steady(&self.period, self.runs, self.batch, rate.clone(), obs);
+            let mut new = self.steady(rate.clone(), obs);
             {
                 rec.append(&mut new);
             }
@@ -256,6 +407,186 @@ impl Model {
         self
     }
 
+    /// Randomly selects a rate from ranges `rate` for a steady state reservoir,
+    /// and simulates accumulation records
+    /// in batches using [fit_rate](#method.fit_rate).  Returns the selected input/output pair and the mean
+    /// goodness-of-fit statistics compared to `obs` for each pair.
+    /// Called by [fit_steady](#method.fit_steady).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use reservoirs::prelude::*;
+    ///
+    /// // mean expected deposit age and inherited age by facies
+    /// let dep = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/dep.csv")?;
+    /// let iat = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/iat.csv")?;
+    ///
+    /// // subset mean ages of debris flows
+    /// let df: Vec<f64> = dep.iter()
+    ///     .filter(|x| x.facies == "DF")
+    ///     .map(|x| x.age)
+    ///     .collect();
+    ///
+    /// // subset inherited ages
+    /// let ia: Vec<f64> = iat.iter()
+    ///     .map(|x| x.age)
+    ///     .collect();
+    ///
+    /// let mut debris_flows = Reservoir::new()
+    ///     .input(&0.687)?
+    ///     .output(&0.687)?
+    ///     .inherit(&ia);
+    ///
+    /// // model parameters
+    /// let batch = 10;  // fit 10 input/output pairs at a time using rayon
+    /// let period = 30000.0; // run simulations for 30000 years
+    /// let runs = 1000; // run 1000 simulated accumulations per candidate pair for goodness-of-fit
+    ///
+    /// // create reservoir model using builder pattern
+    /// let mut model = Model::new(debris_flows)
+    ///     .batch(batch)
+    ///     .period(&period)
+    ///     .runs(runs);
+    /// // fit a batch of 10 randomly selected rate pairs (from range 0.01 to 1.0)
+    /// // to observed debris flows
+    /// // by running 1000 simulations for 30000 years for each pair
+    /// let gofs = model.steady(0.01..1.0, &df);
+    /// ```
+    pub fn steady(&mut self, rate: std::ops::Range<f64>, obs: &[f64]) -> Vec<Gof> {
+        let mut rates = Vec::with_capacity(self.batch);
+        let mut fits = Vec::with_capacity(self.batch);
+        for i in 0..self.batch {
+            rates.push(
+                rand::distributions::Uniform::from(rate.clone()).sample(&mut self.reservoir.range),
+            );
+            fits.push(
+                self.clone().reservoir(
+                    self.reservoir
+                        .clone()
+                        .input(&rates[i])
+                        .unwrap()
+                        .output(&rates[i])
+                        .unwrap(),
+                ),
+            );
+        }
+        let gof: Vec<(f64, f64, f64)> = fits.par_iter().map(|x| x.clone().fit_rate(&obs)).collect();
+        let mut gofs = Vec::with_capacity(self.batch);
+        for i in 0..self.batch {
+            gofs.push(Gof {
+                input: rates[i],
+                output: rates[i],
+                ks: gof[i].0,
+                kp: gof[i].1,
+                n: gof[i].2,
+            })
+        }
+        gofs
+    }
+
+    /// Selects from among a number of simulated accumulation records, the record most
+    /// characteristic of the average number and age distribution of deposits.
+    ///  - `self` is a model with reservoir characteristics set.
+    ///  - `bins` is the number of bins with which to construct a cdf.
+    ///  - Returns the record with the lowest loss statistic.
+    ///
+    /// For large numbers of runs, the cdf becomes a large vector.  Selecting a smaller
+    /// number of `bins` reduces memory consumption and increases speed, but can reduce accuracy.
+    ///
+    /// The loss statistic is the K-S stat plus a normalized 'distance from average number
+    /// of deposits'.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use reservoirs::prelude::*;
+    ///
+    /// // mean expected deposit age and inherited age by facies
+    /// let dep = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/dep.csv")?;
+    /// let iat = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/iat.csv")?;
+    ///
+    /// // subset mean ages of debris flows
+    /// let df: Vec<f64> = dep.iter()
+    ///         .filter(|x| x.facies == "DF")
+    ///         .map(|x| x.age)
+    ///        .collect();
+    /// // subset inherited ages
+    /// let ia: Vec<f64> = iat.iter()
+    ///     .map(|x| x.age)
+    ///     .collect();
+    ///
+    /// let mut debris_flows = Reservoir::new()
+    ///     .input(&0.687)?
+    ///     .output(&0.687)?
+    ///     .inherit(&ia);
+    ///
+    /// // model parameters
+    /// let period = 30000.0; // run simulations for 30000 years
+    /// let runs = 1000; // run 1000 simulated accumulations per candidate pair for goodness-of-fit
+    ///
+    /// // create reservoir model using builder pattern
+    /// let mut model = Model::new(debris_flows)
+    ///     .period(&period)
+    ///     .runs(runs);
+    ///
+    /// // sample a stereotypical record from 1000 runs of 30000 years
+    /// let eg = model.stereotype(500);
+    /// // compare the CDF of the synthetic example to the observed debris-flow deposit record
+    /// plot::comp_cdf(&eg, &df, "examples/df_cdf.png");
+    ///```
+    pub fn stereotype(&mut self, bins: usize) -> Vec<f64> {
+        let mut res: Vec<Model> = Vec::with_capacity(self.runs);
+        let seeder: rand::distributions::Uniform<u64> =
+            rand::distributions::Uniform::new(0, 10000000);
+        let seeds: Vec<u64> = seeder
+            .sample_iter(&mut self.reservoir.range)
+            .take(self.runs)
+            .collect();
+
+        for seed in seeds {
+            // make boot number copies of reservoir
+            res.push(self.clone().reservoir(self.reservoir.clone().range(seed)));
+        }
+        let res: Vec<Reservoir> = res
+            .par_iter()
+            .cloned()
+            .map(|x| x.reservoir.sim(&self.period).unwrap())
+            .collect(); // simulate accumulation record for each copy
+        let mut ns: Vec<f64> = res
+            .par_iter()
+            .cloned()
+            .map(|x| x.mass.len() as f64)
+            .collect(); // number of deposits in reservoir
+        let mid_n = utils::median(&ns); // median number of deposits
+        ns = ns
+            .iter()
+            .map(|x| rand_distr::num_traits::abs((x / mid_n) - 1.0))
+            .collect(); // distance from median length
+                        // collect reservoir masses into single vector and calculate the cdf
+        let mut rec = Vec::new(); // vector of mass
+        for r in res.clone() {
+            rec.append(&mut r.mass.clone()); // add each run to make one long vector
+        }
+        let cdf = utils::cdf_bin(&rec, bins); // subsample vector to length bins
+
+        // TODO:  parallelize
+        let gof: Vec<(f64, f64)> = res.par_iter().cloned().map(|x| x.gof(&cdf)).collect(); // ks and kp values
+        let ks: Vec<f64> = gof.par_iter().cloned().map(|x| x.0).collect(); // clip to just ks values
+        let mut least = 1.0; // test for lowest fit (set to high value)
+        let mut low = Reservoir::new(); // initialize variable to hold lowest fit
+        for (i, val) in ns.iter().enumerate() {
+            let loss = ks[i] + val; // loss function
+            if loss < least {
+                // if lowest value
+                low = res[i].clone(); // copy to low
+                least = loss; // set least to new low value
+            }
+        }
+
+        low.mass
+    }
+
     /// Produces a raw vector of observations of simulated transit times from multiple runs.
     /// Used to produce statistics on the mean, median and statistical moments.
     ///
@@ -275,9 +606,9 @@ impl Model {
     /// let fines = Reservoir::new().input(&ff_rt)?.output(&ff_rt)?;
     /// let gravels = Reservoir::new().input(&fg_rt)?.output(&fg_rt)?;
     ///
-    /// let df_mod = Model::new(debris_flows).period(&period).runs(runs);
-    /// let ff_mod = Model::new(fines).period(&period).runs(runs);
-    /// let fg_mod = Model::new(gravels).period(&period).runs(runs);
+    /// let mut df_mod = Model::new(debris_flows).period(&period).runs(runs);
+    /// let mut ff_mod = Model::new(fines).period(&period).runs(runs);
+    /// let mut fg_mod = Model::new(gravels).period(&period).runs(runs);
     ///
     /// // vector of transit times
     /// let df_t = df_mod.transit_times();
@@ -289,10 +620,16 @@ impl Model {
     /// println!("Fluvial gravels transit time quantiles are {:?}", utils::quantiles(&fg_t));
     ///
     /// ```
-    pub fn transit_times(&self) -> Vec<f64> {
+    pub fn transit_times(&mut self) -> Vec<f64> {
         let mut res = Vec::with_capacity(self.runs);
-        for _ in 0..self.runs {
-            res.push(self.reservoir.clone());
+        let seeder: rand::distributions::Uniform<u64> =
+            rand::distributions::Uniform::new(0, 10000000);
+        let seeds: Vec<u64> = seeder
+            .sample_iter(&mut self.reservoir.range)
+            .take(self.runs)
+            .collect();
+        for seed in seeds {
+            res.push(self.reservoir.clone().range(seed));
         }
         res = res
             .par_iter()
@@ -331,7 +668,7 @@ pub struct Sample {
 }
 
 /// Struct for recording reservoir characteristics.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct Reservoir {
     input: Option<Exp<f64>>,
     /// Ages (in years) of deposits accumulated in reservoir.
@@ -387,122 +724,6 @@ impl From<std::io::Error> for ResError {
 }
 
 impl Reservoir {
-    /// Randomly selects rate pairs from ranges `input` and `output`, and simulates `boot` number of accumulation records
-    /// in batches of `bat` using [fit_rate](#method.fit_rate).  Returns the selected input/output pair and the mean
-    /// goodness-of-fit statistics for each pair from `boot` simulations.  Called by [fit_range](struct.Model.html#method.fit_range).
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use reservoirs::prelude::*;
-    ///
-    /// // mean expected deposit age and inherited age by facies
-    /// let dep = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/dep.csv")?;
-    /// let iat = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/iat.csv")?;
-    ///
-    /// // subset mean ages of debris flows
-    /// let df: Vec<f64> = dep.iter().filter(|x| x.facies == "DF").map(|x| x.age).collect();
-    /// // subset inherited ages
-    /// let ia: Vec<f64> = iat.iter().map(|x| x.age).collect();
-    ///
-    /// let mut debris_flows = Reservoir::new().input(&0.78)?.output(&0.78)?.inherit(&ia);
-    /// // fit 10 randomly selected rate pairs (from range 0.01 to 1.0) to observed debris flows
-    /// // by running 1000 simulations for 30000 years for each pair
-    /// let gofs = debris_flows.fit_rng(&30000.0, 1000, 10, 0.01..1.0, 0.01..1.0, &df);
-    /// ```
-    pub fn fit_rng(
-        &mut self,
-        period: &f64,
-        boot: usize,
-        bat: usize,
-        input: std::ops::Range<f64>,
-        output: std::ops::Range<f64>,
-        obs: &[f64],
-    ) -> Vec<Gof> {
-        let mut inputs = Vec::with_capacity(bat);
-        let mut outputs = Vec::with_capacity(bat);
-        let mut fits = Vec::with_capacity(bat);
-        for i in 0..bat {
-            inputs.push(rand::distributions::Uniform::from(input.clone()).sample(&mut self.range));
-            outputs.push(
-                rand::distributions::Uniform::from(
-                    output.clone().start.max(inputs[i] * 0.975)
-                        ..output.clone().end.min(inputs[i] * 1.0125),
-                )
-                .sample(&mut self.range),
-            );
-            fits.push(
-                self.clone()
-                    .input(&inputs[i])
-                    .unwrap()
-                    .output(&outputs[i])
-                    .unwrap(),
-            );
-        }
-        let gof: Vec<(f64, f64, f64)> = fits
-            .par_iter()
-            .map(|x| x.fit_rate(period, &obs, boot))
-            .collect();
-        let mut gofs = Vec::with_capacity(bat);
-        for i in 0..bat {
-            gofs.push(Gof {
-                input: inputs[i],
-                output: outputs[i],
-                ks: gof[i].0,
-                kp: gof[i].1,
-                n: gof[i].2,
-            })
-        }
-        gofs
-    }
-
-    /// Runs `boot` number of simulations of length `period` on a reservoir.
-    /// Returns the mean goodness-of-fit statistics compared to accumulation record `other`.
-    /// Called by [fit_rng](#method.fit_rng) and [steady](#method.steady).  To use,
-    /// set characteristics of the reservoir before running.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use reservoirs::prelude::*;
-    ///
-    /// // mean expected deposit age and inherited age by facies
-    /// let dep = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/dep.csv")?;
-    /// let iat = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/iat.csv")?;
-    ///
-    /// // subset mean ages of debris flows
-    /// let df: Vec<f64> = dep.iter().filter(|x| x.facies == "DF").map(|x| x.age).collect();
-    /// // subset inherited ages
-    /// let ia: Vec<f64> = iat.iter().map(|x| x.age).collect();
-    ///
-    /// let mut debris_flows = Reservoir::new().input(&0.78)?.output(&0.78)?.inherit(&ia);
-    /// // run 1000 simulations for 30000 years and compare the fit against observed debris flows
-    /// let (ks, kp, _) = debris_flows.fit_rate(&30000.0, &df, 1000);
-    /// println!("K-S fit is {}.", ks);
-    /// println!("Kuiper fit is {}.", kp);
-    ///
-    /// ```
-    pub fn fit_rate(&self, period: &f64, other: &[f64], boot: usize) -> (f64, f64, f64) {
-        let mut res: Vec<Reservoir> = Vec::with_capacity(boot);
-        for _ in 0..boot {
-            res.push(self.clone());
-        }
-        res = res
-            .par_iter()
-            .cloned()
-            .map(|x| x.sim(period).unwrap())
-            .collect();
-        let fits: Vec<(f64, f64)> = res.par_iter().cloned().map(|x| x.gof(other)).collect();
-        let kss: Vec<f64> = fits.par_iter().map(|x| x.0).collect();
-        let kps: Vec<f64> = fits.par_iter().map(|x| x.1).collect();
-        let ns: Vec<f64> = res
-            .iter()
-            .map(|x| x.mass.len() as f64 / other.len() as f64)
-            .collect();
-
-        (utils::mean(&kss), utils::median(&kps), utils::mean(&ns))
-    }
-
     /// Compare the accumulated mass in a reservoir to another record.
     /// Produces two goodness-of-fit statistics in a tuple:
     /// the K-S statistic and the Kuiper statistic, respectively.
@@ -612,7 +833,7 @@ impl Reservoir {
             output: None,
             flux: Vec::new(),
             inherit: None,
-            range: rand::SeedableRng::seed_from_u64(10101),
+            range: rand::rngs::StdRng::from_entropy(),
         }
     }
 
@@ -714,154 +935,6 @@ impl Reservoir {
         self.mass = mass;
         // self.flux = flux;
         Ok(self)
-    }
-
-    /// Selects from among a number of simulated accumulation records, the record most
-    /// characteristic of the average number and age distribution of deposits.
-    ///  - `self` is a reservoir with characteristics set.
-    ///  - `boot` is the number of times to simulate an accumulation record from `self`
-    ///  - `bins` is the number of bins with which to construct a cdf.
-    ///  - Returns the record with the lowest loss statistic.
-    ///
-    /// For large numbers of `boot`, the cdf becomes a large vector.  Selecting a smaller
-    /// number of `bins` reduces memory consumption and increases speed, but can reduce accuracy.
-    ///
-    /// The loss statistic is the K-S stat plus a normalized 'distance from average number
-    /// of deposits'.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use reservoirs::prelude::*;
-    ///
-    /// // mean expected deposit age and inherited age by facies
-    /// let dep = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/dep.csv")?;
-    /// let iat = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/iat.csv")?;
-    ///
-    /// // subset mean ages of debris flows
-    /// let df: Vec<f64> = dep.iter()
-    ///         .filter(|x| x.facies == "DF")
-    ///         .map(|x| x.age)
-    ///        .collect();
-    /// // subset inherited ages
-    /// let ia: Vec<f64> = iat.iter()
-    ///         .map(|x| x.age)
-    ///         .collect();
-    ///
-    /// // create steady state reservoir with charcoal inherited ages
-    /// let res = Reservoir::new().input(&0.78)?
-    ///         .output(&0.78)?
-    ///         .inherit(&ia);
-    /// // sample a stereotypical record from 1000 runs of 30000 years
-    /// let eg = res.stereotype(&30000.0, 1000, 200);
-    /// // compare the CDF of the synthetic example to the observed debris-flow deposit record
-    /// plot::comp_cdf(&eg, &df, "examples/df_cdf.png");
-    ///```
-    pub fn stereotype(&self, period: &f64, boot: usize, bins: usize) -> Vec<f64> {
-        let mut res: Vec<Reservoir> = Vec::with_capacity(boot);
-        for _ in 0..boot {
-            // make boot number copies of reservoir
-            res.push(self.clone());
-        }
-        res = res
-            .par_iter()
-            .cloned()
-            .map(|x| x.sim(period).unwrap())
-            .collect(); // simulate accumulation record for each copy
-        let mut ns: Vec<f64> = res
-            .par_iter()
-            .cloned()
-            .map(|x| x.mass.len() as f64)
-            .collect(); // number of deposits in reservoir
-        let mid_n = utils::median(&ns); // median number of deposits
-        ns = ns
-            .iter()
-            .map(|x| rand_distr::num_traits::abs((x / mid_n) - 1.0))
-            .collect(); // distance from median length
-                        // collect reservoir masses into single vector and calculate the cdf
-        let mut rec = Vec::new(); // vector of mass
-        for r in res.clone() {
-            rec.append(&mut r.mass.clone()); // add each run to make one long vector
-        }
-        let cdf = utils::cdf_bin(&rec, bins); // subsample vector to length bins
-
-        // TODO:  parallelize
-        let gof: Vec<(f64, f64)> = res.par_iter().cloned().map(|x| x.gof(&cdf)).collect(); // ks and kp values
-        let ks: Vec<f64> = gof.par_iter().cloned().map(|x| x.0).collect(); // clip to just ks values
-        let mut least = 1.0; // test for lowest fit (set to high value)
-        let mut low = Reservoir::new(); // initialize variable to hold lowest fit
-        for (i, val) in ns.iter().enumerate() {
-            let loss = ks[i] + val; // loss function
-            if loss < least {
-                // if lowest value
-                low = res[i].clone(); // copy to low
-                least = loss; // set least to new low value
-            }
-        }
-
-        low.mass
-    }
-
-    /// Randomly selects a rate from ranges `rate` for a steady state reservoir,
-    /// and simulates `boot` number of accumulation records
-    /// in batches of `bat` using [fit_rate](#method.fit_rate).  Returns the selected input/output pair and the mean
-    /// goodness-of-fit statistics compared to `obs` for each pair from `boot` simulations.
-    /// Called by [fit_steady](struct.Model.html#method.fit_steady).
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use reservoirs::prelude::*;
-    ///
-    /// // mean expected deposit age and inherited age by facies
-    /// let dep = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/dep.csv")?;
-    /// let iat = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/iat.csv")?;
-    ///
-    /// // subset mean ages of debris flows
-    /// let df: Vec<f64> = dep.iter().filter(|x| x.facies == "DF").map(|x| x.age).collect();
-    /// // subset inherited ages
-    /// let ia: Vec<f64> = iat.iter().map(|x| x.age).collect();
-    ///
-    /// let mut debris_flows = Reservoir::new().input(&0.78)?.output(&0.78)?.inherit(&ia);
-    /// // fit 10 steady state reservoirs with randomly selected rates (from range 0.01 to 1.0) to observed debris flows
-    /// // by running 1000 simulations for 30000 years for each pair
-    /// let gofs = debris_flows.steady(&30000.0, 1000, 10, 0.01..1.0, &df);
-    /// ```
-    pub fn steady(
-        &mut self,
-        period: &f64,
-        boot: usize,
-        bat: usize,
-        rate: std::ops::Range<f64>,
-        obs: &[f64],
-    ) -> Vec<Gof> {
-        let mut rates = Vec::with_capacity(bat);
-        let mut fits = Vec::with_capacity(bat);
-        for i in 0..bat {
-            rates.push(rand::distributions::Uniform::from(rate.clone()).sample(&mut self.range));
-            fits.push(
-                self.clone()
-                    .input(&rates[i])
-                    .unwrap()
-                    .output(&rates[i])
-                    .unwrap(),
-            );
-        }
-        let gof: Vec<(f64, f64, f64)> = fits
-            .par_iter()
-            .map(|x| x.fit_rate(period, &obs, boot))
-            .collect();
-        let mut gofs = Vec::with_capacity(bat);
-        for i in 0..bat {
-            gofs.push(Gof {
-                input: rates[i],
-                output: rates[i],
-                ks: gof[i].0,
-                kp: gof[i].1,
-                n: gof[i].2,
-            })
-        }
-        gofs
     }
 }
 
