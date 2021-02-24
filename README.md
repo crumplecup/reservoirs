@@ -21,7 +21,7 @@ of academic transparency.
 To use reservoirs, add it to your `Cargo.toml`
 ```toml
 [dependencies]
-reservoirs = "^0.1.5"
+reservoirs = "^0.1.6"
 ```
 
 Let's load the stream bank charcoal data from the Oregon Coast that I use 
@@ -46,12 +46,22 @@ fn main() -> Result<(), ResError>{
         .map(|x| x.age)
         .collect();
 
-    // create steady state reservoir with charcoal inherited ages
-    let res = Reservoir::new().input(&0.78)?
-        .output(&0.78)?
+    let mut debris_flows = Reservoir::new()
+        .input(&0.687)?
+        .output(&0.687)?
         .inherit(&ia);
+
+    // model parameters
+    let period = 30000.0; // run simulations for 30000 years
+    let runs = 1000; // run 1000 simulated accumulations per candidate pair for goodness-of-fit
+
+    // create reservoir model using builder pattern
+    let mut model = Model::new(debris_flows)
+        .period(&period)
+        .runs(runs);
+
     // sample a stereotypical record from 1000 runs of 30000 years
-    let eg = res.stereotype(&30000.0, 1000, 200);
+    let eg = model.stereotype(500);
     // compare the CDF of the synthetic example to the observed debris-flow deposit record
     plot::comp_cdf(&eg, &df, "examples/df_cdf.png");
 

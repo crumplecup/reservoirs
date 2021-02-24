@@ -22,7 +22,7 @@
 * To use reservoirs, add it to your `Cargo.toml`
 * ```toml
 * [dependencies]
-* reservoirs = "^0.1.5"
+* reservoirs = "^0.1.6"
 * ```
 *
 *  - Load the crate prelude in the preamble of your `main.rs`.
@@ -31,28 +31,40 @@
 * use reservoirs::prelude::*;
 *
 * fn main() -> Result<(), ResError>{
-*     // mean expected deposit age and inherited age by facies
-*     let dep = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/dep.csv")?;
-*     let iat = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/iat.csv")?;
+* use reservoirs::prelude::*;
 *
-*     // subset mean ages of debris flows
-*     let df: Vec<f64> = dep.iter()
+* // mean expected deposit age and inherited age by facies
+* let dep = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/dep.csv")?;
+* let iat = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/iat.csv")?;
+*
+* // subset mean ages of debris flows
+* let df: Vec<f64> = dep.iter()
 *         .filter(|x| x.facies == "DF")
 *         .map(|x| x.age)
-*         .collect();
-*     // subset inherited ages
-*     let ia: Vec<f64> = iat.iter()
-*         .map(|x| x.age)
-*         .collect();
+*        .collect();
+* // subset inherited ages
+* let ia: Vec<f64> = iat.iter()
+*     .map(|x| x.age)
+*     .collect();
 *
-*     // create steady state reservoir with charcoal inherited ages
-*     let res = Reservoir::new().input(&0.78)?
-*         .output(&0.78)?
-*         .inherit(&ia);
-*     // sample a stereotypical record from 1000 runs of 30000 years
-*     let eg = res.stereotype(&30000.0, 1000, 200);
-*     // compare the CDF of the synthetic example to the observed debris-flow deposit record
-*     plot::comp_cdf(&eg, &df, "examples/df_cdf.png");
+* let mut debris_flows = Reservoir::new()
+*     .input(&0.687)?
+*     .output(&0.687)?
+*     .inherit(&ia);
+*
+* // model parameters
+* let period = 30000.0; // run simulations for 30000 years
+* let runs = 1000; // run 1000 simulated accumulations per candidate pair for goodness-of-fit
+*
+* // create reservoir model using builder pattern
+* let mut model = Model::new(debris_flows)
+*     .period(&period)
+*     .runs(runs);
+*
+* // sample a stereotypical record from 1000 runs of 30000 years
+* let eg = model.stereotype(500);
+* // compare the CDF of the synthetic example to the observed debris-flow deposit record
+*   plot::comp_cdf(&eg, &df, "examples/df_cdf.png");
 *
 *     Ok(())
 * }
