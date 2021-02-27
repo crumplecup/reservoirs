@@ -38,6 +38,29 @@ pub fn cdf_bin(obs: &[f64], bins: usize) -> Vec<f64> {
     cdf_bin
 }
 
+/// Calculates the low point along `y` and returns the value of `x` at the low point.
+pub fn low_point(x: Vec<f64>, y: Vec<f64>) -> f64 {
+    let mut x_slope = Vec::new();
+    for i in 0..(x.len()-1) {
+        x_slope.push(x[i+1] - x[i]);
+    }
+    let mut x_momentum = vec![x_slope.iter().sum::<f64>().abs()];
+    for i in 0..(x_slope.len()-1) {
+        let before: f64 = x_slope[0..(i-1)].iter().sum::<f64>().abs();
+        let after: f64 = x_slope[i..(x_slope.len()-1)].iter().sum::<f64>().abs();
+        x_momentum.push(before + after);
+    }
+    x_momentum.push(x_slope.iter().sum::<f64>().abs());
+    let mut low = Vec::new();
+    let x_max: f64 = x_momentum.iter().fold(0.0, |acc, z| f64::max(acc, *z));
+    for (i, val) in x_momentum.iter().enumerate() {
+        if (*val - x_max) < 0.0001 {
+            low.push(y[i])
+        }
+    }
+    y[0]
+}
+
 /// Calculate the mean of a slice of f64 values.
 ///  - `numbers` is a reference to a slice of f64 values.
 ///  - Returns the mean of `numbers`.

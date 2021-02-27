@@ -6,7 +6,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 /// Holder struct for goodness-of-fit statistics.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Gof {
     input: f64,
     output: f64,
@@ -42,6 +42,30 @@ impl Gof {
     /// Get the values associated with fields of the struct.
     pub fn values(&self) -> (f64, f64, f64, f64, f64) {
         (self.input, self.output, self.ks, self.kp, self.n)
+    }
+}
+
+/// The Record trait indicates the data is organized in spreadsheet format with
+/// variables by column and observations by row (using struct fields as column names).
+/// Trait methods provides convenience functions for wrangling spreadsheet data.
+pub trait Record {
+    /// Sorts data and divides into bins, returning averages by bin.
+    fn bin_ave(&self, bins: usize) -> (Vec<f64>, Vec<f64>);
+}
+
+impl Record for Vec<Gof> {
+    /// Orders of vector of Gof structs by input rate,
+    /// breaks into chunks based on the number of bins desired `bins`,
+    /// returns the mean input rate and ks fit per bin.
+    fn bin_ave(&self, bins: usize) -> (Vec<f64>, Vec<f64>) {
+        let ord = &mut (*self).clone();
+        ord.sort_by(|x, y| x.input.partial_cmp(&y.input).unwrap());
+        let chunk_ln = (ord.len() as f64 / bins as f64).round() as usize;
+        let rates: Vec<f64> = ord.iter().map(|x| x.input).collect();
+        let rates: Vec<f64> = rates.chunks(chunk_ln).map(|x| utils::mean(&x)).collect();
+        let fits: Vec<f64> = ord.iter().map(|x| x.ks).collect();
+        let fits: Vec<f64> = fits.chunks(chunk_ln).map(|x| utils::mean(&x)).collect();
+        (rates, fits)
     }
 }
 

@@ -100,6 +100,7 @@
 */
 #![feature(intra_doc_pointers)]
 #![warn(missing_docs)]
+#![forbid(unsafe_code)]
 /// Plotting functions for reservoir models.
 pub mod plot;
 /// Structs and methods related to simulating reservoir models.
