@@ -47,7 +47,9 @@ pub fn low_point(x: Vec<f64>, y: Vec<f64>) -> f64 {
     }
     println!("x_slope is len {}", x_slope.len());
     let mut x_momentum: Vec<f64> = vec![x_slope.iter().sum::<f64>().abs()];
+    println!("x_momentum is {:?}", x_momentum);
     for i in 0..(x_slope.len()-1) {
+        println!("i is {}", i);
         let before: f64 = x_slope[0..(i-1)].iter().sum::<f64>().abs();
         let after: f64 = x_slope[i..(x_slope.len()-1)].iter().sum::<f64>().abs();
         x_momentum.push(before + after);
