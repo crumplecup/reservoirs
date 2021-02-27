@@ -57,7 +57,7 @@ pub fn low_point(x: Vec<f64>, y: Vec<f64>) -> f64 {
     println!("y_max is {}", y_max);
     println!("y_momentum is {:?}", y_momentum);
     for (i, val) in y_momentum.iter().enumerate() {
-        if (*val - y_max) < 0.00001 {
+        if (y_max - *val) < 0.00001 {
             low.push(x[i])
         }
     }
