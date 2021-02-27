@@ -40,30 +40,25 @@ pub fn cdf_bin(obs: &[f64], bins: usize) -> Vec<f64> {
 
 /// Calculates the low point along `y` and returns the value of `x` at the low point.
 pub fn low_point(x: Vec<f64>, y: Vec<f64>) -> f64 {
-    let mut x_slope: Vec<f64> = Vec::new();
-    println!("x is len {}", x.len());
-    for i in 0..(x.len()-1) {
-        x_slope.push(x[i+1] - x[i]);
+    let mut y_slope: Vec<f64> = Vec::new();
+    for i in 0..(y.len()-1) {
+        y_slope.push(y[i+1] - y[i]);
     }
-    println!("x_slope is len {}", x_slope.len());
-    let mut x_momentum: Vec<f64> = vec![x_slope.iter().sum::<f64>().abs()];
-    println!("x_momentum is {:?}", x_momentum);
-    for i in 0..(x_slope.len()-1) {
-        println!("i is {}", i);
-        let before: f64 = x_slope[0..(i+1)].iter().sum::<f64>().abs();
-        let after: f64 = x_slope[(i+1)..x_slope.len()].iter().sum::<f64>().abs();
-        x_momentum.push(before + after);
+    let mut y_momentum: Vec<f64> = vec![y_slope.iter().sum::<f64>().abs()];
+    for i in 0..(y_slope.len()-1) {
+        let before: f64 = y_slope[0..(i+1)].iter().sum::<f64>().abs();
+        let after: f64 = y_slope[(i+1)..y_slope.len()].iter().sum::<f64>().abs();
+        y_momentum.push(before + after);
     }
-    x_momentum.push(x_slope.iter().sum::<f64>().abs());
-    println!("x_momemtum is len {}", x_momentum.len());
+    y_momentum.push(y_slope.iter().sum::<f64>().abs());
     let mut low: Vec<f64> = Vec::new();
-    let x_max: f64 = x_momentum.iter().fold(0.0, |acc, z| f64::max(acc, *z));
-    for (i, val) in x_momentum.iter().enumerate() {
-        if (*val - x_max) < 0.0001 {
-            low.push(y[i])
+    let y_max: f64 = y_momentum.iter().fold(0.0, |acc, z| f64::max(acc, *z));
+    for (i, val) in y_momentum.iter().enumerate() {
+        if (*val - y_max) < 0.0001 {
+            low.push(x[i])
         }
     }
-    y[0]
+    x[0]
 }
 
 /// Calculate the mean of a slice of f64 values.
