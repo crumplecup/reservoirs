@@ -40,18 +40,21 @@ pub fn cdf_bin(obs: &[f64], bins: usize) -> Vec<f64> {
 
 /// Calculates the low point along `y` and returns the value of `x` at the low point.
 pub fn low_point(x: Vec<f64>, y: Vec<f64>) -> f64 {
-    let mut x_slope = Vec::new();
+    let mut x_slope: Vec<f64> = Vec::new();
+    println!("x is len {}", x.len());
     for i in 0..(x.len()-1) {
         x_slope.push(x[i+1] - x[i]);
     }
-    let mut x_momentum = vec![x_slope.iter().sum::<f64>().abs()];
+    println!("x_slope is len {}", x_slope.len());
+    let mut x_momentum: Vec<f64> = vec![x_slope.iter().sum::<f64>().abs()];
     for i in 0..(x_slope.len()-1) {
         let before: f64 = x_slope[0..(i-1)].iter().sum::<f64>().abs();
         let after: f64 = x_slope[i..(x_slope.len()-1)].iter().sum::<f64>().abs();
         x_momentum.push(before + after);
     }
     x_momentum.push(x_slope.iter().sum::<f64>().abs());
-    let mut low = Vec::new();
+    println!("x_momemtum is len {}", x_momentum.len());
+    let mut low: Vec<f64> = Vec::new();
     let x_max: f64 = x_momentum.iter().fold(0.0, |acc, z| f64::max(acc, *z));
     for (i, val) in x_momentum.iter().enumerate() {
         if (*val - x_max) < 0.0001 {
