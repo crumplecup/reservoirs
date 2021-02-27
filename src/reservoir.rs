@@ -1,5 +1,6 @@
 //! Structs and methods for Bolin & Rodhes reservoir models.
 use crate::utils;
+use crate::plot;
 use rand::SeedableRng;
 use rand_distr::{Distribution, Exp};
 use rayon::prelude::*;
@@ -45,30 +46,6 @@ impl Gof {
     }
 }
 
-/// The Record trait indicates the data is organized in spreadsheet format with
-/// variables by column and observations by row (using struct fields as column names).
-/// Trait methods provides convenience functions for wrangling spreadsheet data.
-pub trait Record {
-    /// Sorts data and divides into bins, returning averages by bin.
-    fn bin_ave(&self, bins: usize) -> (Vec<f64>, Vec<f64>);
-}
-
-impl Record for Vec<Gof> {
-    /// Orders of vector of Gof structs by input rate,
-    /// breaks into chunks based on the number of bins desired `bins`,
-    /// returns the mean input rate and ks fit per bin.
-    fn bin_ave(&self, bins: usize) -> (Vec<f64>, Vec<f64>) {
-        let ord = &mut (*self).clone();
-        ord.sort_by(|x, y| x.input.partial_cmp(&y.input).unwrap());
-        let chunk_ln = (ord.len() as f64 / bins as f64).round() as usize;
-        let rates: Vec<f64> = ord.iter().map(|x| x.input).collect();
-        let rates: Vec<f64> = rates.chunks(chunk_ln).map(|x| utils::mean(&x)).collect();
-        let fits: Vec<f64> = ord.iter().map(|x| x.ks).collect();
-        let fits: Vec<f64> = fits.chunks(chunk_ln).map(|x| utils::mean(&x)).collect();
-        (rates, fits)
-    }
-}
-
 /// Holds model characteristics associated with a reservoir.
 #[derive(Clone, Debug)]
 pub struct Model {
@@ -77,12 +54,20 @@ pub struct Model {
     runs: usize,
     batch: usize,
     duration: u64,
+    bins: usize,
+    mean_samples: usize,
 }
 
 impl Model {
     /// Sets the model batch size to desired number of samples.
     pub fn batch(mut self, samples: usize) -> Self {
         self.batch = samples;
+        self
+    }
+
+    /// Sets the model bin number for comparing ranges in [search](#method.search).
+    pub fn bins(mut self, size: usize) -> Self {
+        self.bins = size;
         self
     }
 
@@ -410,7 +395,16 @@ impl Model {
             runs: 100,
             batch: 10,
             duration: 1,
+            bins: 100,
+            mean_samples: 30,
         }
+    }
+
+    /// Sets the number of samples desired for calculating the mean in a range,
+    /// called by [search](#method.search).
+    pub fn mean_samples(mut self, samples: usize) -> Self {
+        self.mean_samples = samples;
+        self
     }
 
     /// Sets the model period to desired time in years.
@@ -429,6 +423,20 @@ impl Model {
     pub fn runs(mut self, times: usize) -> Self {
         self.runs = times;
         self
+    }
+
+    /// Fits range of rates to an observed distribution using a steady state reservoir.
+    pub fn search(&mut self, rate: std::ops::Range<f64>, obs: &[f64], path: &str) -> f64 {
+        let mut rec = Vec::new();
+        while rec.len() < (self.bins * self.mean_samples) {
+            let mut new = self.steady(rate.clone(), obs);
+            rec.append(&mut new);
+            println!("{}% complete.", rec.len() / (self.bins * self.mean_samples));
+        }
+        Gof::record(&mut rec, &*format!("{}{}", path, "rec.csv")).unwrap();
+        let (x, y) = Record::bin_ave(&rec, self.bins);
+        plot::xy(&x, &y, &*format!("{}{}", path, "rec.png")).unwrap();
+        utils::low_point(&x, &y)
     }
 
     /// Randomly selects a rate from ranges `rate` for a steady state reservoir,
@@ -677,19 +685,12 @@ impl Default for Model {
             runs: 100,
             batch: 10,
             duration: 1,
+            bins: 100,
+            mean_samples: 30,
         }
     }
 }
 
-/// Holder struct to read in charcoal sample ages from csv.
-#[derive(Debug, Deserialize)]
-pub struct Sample {
-    id: String,
-    /// Mean estimated charcoal age in years before 2000.
-    pub age: f64,
-    /// Deposit type - either debris flows (DF), fluvial fines (FF) or fluvial gravels (FG).
-    pub facies: String,
-}
 
 /// Struct for recording reservoir characteristics.
 #[derive(Clone, Debug)]
@@ -968,6 +969,17 @@ impl Default for Reservoir {
     }
 }
 
+/// Holder struct to read in charcoal sample ages from csv.
+#[derive(Debug, Deserialize)]
+pub struct Sample {
+    id: String,
+    /// Mean estimated charcoal age in years before 2000.
+    pub age: f64,
+    /// Deposit type - either debris flows (DF), fluvial fines (FF) or fluvial gravels (FG).
+    pub facies: String,
+}
+
+
 impl Sample {
     /// Converts a csv file of charcoal ages into a Sample struct.
     pub fn read(path: &str) -> Result<Vec<Sample>, ResError> {
@@ -980,5 +992,30 @@ impl Sample {
             record.push(row);
         }
         Ok(record)
+    }
+}
+
+
+/// The Record trait indicates the data is organized in spreadsheet format with
+/// variables by column and observations by row (using struct fields as column names).
+/// Trait methods provides convenience functions for wrangling spreadsheet data.
+pub trait Record {
+    /// Sorts data and divides into bins, returning averages by bin.
+    fn bin_ave(&self, bins: usize) -> (Vec<f64>, Vec<f64>);
+}
+
+impl Record for Vec<Gof> {
+    /// Orders of vector of Gof structs by input rate,
+    /// breaks into chunks based on the number of bins desired `bins`,
+    /// returns the mean input rate and ks fit per bin.
+    fn bin_ave(&self, bins: usize) -> (Vec<f64>, Vec<f64>) {
+        let ord = &mut (*self).clone();
+        ord.sort_by(|x, y| x.input.partial_cmp(&y.input).unwrap());
+        let chunk_ln = (ord.len() as f64 / bins as f64).round() as usize;
+        let rates: Vec<f64> = ord.iter().map(|x| x.input).collect();
+        let rates: Vec<f64> = rates.chunks(chunk_ln).map(|x| utils::mean(&x)).collect();
+        let fits: Vec<f64> = ord.iter().map(|x| x.ks).collect();
+        let fits: Vec<f64> = fits.chunks(chunk_ln).map(|x| utils::mean(&x)).collect();
+        (rates, fits)
     }
 }

@@ -40,7 +40,7 @@ pub fn cdf_bin(obs: &[f64], bins: usize) -> Vec<f64> {
 }
 
 /// Calculates the low point along `y` and returns the value of `x` at the low point.
-pub fn low_point(x: Vec<f64>, y: Vec<f64>) -> f64 {
+pub fn low_point(x: &[f64], y: &[f64]) -> f64 {
     let mut y_slope: Vec<f64> = Vec::new();
     for i in 0..(y.len()-1) {
         y_slope.push(y[i+1] - y[i]);
