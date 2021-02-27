@@ -1,6 +1,57 @@
 use crate::utils;
 use plotters::prelude::*;
 
+/// Boundary box delineating extent of plotting data.
+pub struct Bbox {
+    xmin: f64,
+    xmax: f64,
+    ymin: f64,
+    ymax: f64,
+}
+
+impl Bbox {
+    fn new(x: &[f64], y: &[f64]) -> Self {
+        let xmin: f64 = x.iter().cloned().fold(0.0, f64::min);
+        let xmax: f64 = x.iter().cloned().fold(0.0, f64::max);
+        let ymin: f64 = y.iter().cloned().fold(0.0, f64::min);
+        let ymax: f64 = y.iter().cloned().fold(0.0, f64::max);
+        Bbox {
+            xmin,
+            xmax,
+            ymin,
+            ymax
+        }
+    }
+}
+
+/// Generic function for plotting results on the fly.
+pub fn xy(x: &[f64], y: &[f64], path: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let bbox = Bbox::new(&x, &y);
+    let xy: Vec<(f64, f64)> = x.iter().cloned().zip(y.iter().cloned()).collect();
+    let root = BitMapBackend::new(path, (640, 480)).into_drawing_area();
+    root.fill(&WHITE)?;
+    root.margin(10, 10, 10, 10);
+    let mut chart = ChartBuilder::on(&root)
+               // .caption("Title", ("sans-serif", 16).into_font())
+        .x_label_area_size(40)
+        .y_label_area_size(60)
+        .build_cartesian_2d(bbox.xmin..bbox.xmax, bbox.ymin..bbox.ymax)?;
+    chart
+        .configure_mesh()
+        // .x_labels(5)
+        // .y_labels(5)
+        .y_label_formatter(&|x| format!("{:.2}", x))
+        .x_label_formatter(&|x| format!("{:.2}", x))
+        // .x_desc("Value")
+        // .y_desc("CDF")
+        .draw()?;
+    chart.draw_series(xy.iter().map(|x| Circle::new((x.0, x.1), 2, BLUE.filled())))?;
+
+    Ok(())
+
+
+}
+
 /// Compare the CDF of two accumulation records.
 pub fn comp_cdf(a: &[f64], b: &[f64], title: &str) -> Result<(), Box<dyn std::error::Error>> {
     let a = utils::cdf(a);
