@@ -431,7 +431,7 @@ impl Model {
         while rec.len() < (self.bins * self.mean_samples) {
             let mut new = self.steady(rate.clone(), obs);
             rec.append(&mut new);
-            println!("{}% complete.", rec.len() / (self.bins * self.mean_samples));
+            println!("{}% complete.", (rec.len() as f64 / (self.bins * self.mean_samples) as f64 * 100).round());
         }
         Gof::record(&mut rec, &*format!("{}{}", path, "rec.csv")).unwrap();
         let (x, y) = Record::bin_ave(&rec, self.bins);
