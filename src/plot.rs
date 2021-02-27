@@ -11,10 +11,10 @@ pub struct Bbox {
 
 impl Bbox {
     fn new(x: &[f64], y: &[f64]) -> Self {
-        let xmin: f64 = x.iter().cloned().fold(0.0, f64::min);
-        let xmax: f64 = x.iter().cloned().fold(f64::NAN, f64::max);
-        let ymin: f64 = y.iter().cloned().fold(0.0, f64::min);
-        let ymax: f64 = y.iter().cloned().fold(f64::NAN, f64::max);
+        let xmin: f64 = x.iter().cloned().fold(f64::NAN, |m, v| v.min(m));
+        let xmax: f64 = x.iter().cloned().fold(f64::NAN, |m, v| v.max(m));
+        let ymin: f64 = y.iter().cloned().fold(f64::NAN, |m, v| v.min(m));
+        let ymax: f64 = y.iter().cloned().fold(f64::NAN, |m, v| v.max(m));
         Bbox {
             xmin,
             xmax,
