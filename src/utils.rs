@@ -53,7 +53,10 @@ pub fn low_point(x: Vec<f64>, y: Vec<f64>) -> f64 {
     }
     y_momentum.push(y_slope.iter().sum::<f64>().abs());
     let mut low: Vec<f64> = Vec::new();
-    let y_max: f64 = y_momentum.iter().cloned().fold(0.0, |m, v| v.max(m));
+    let y_max: f64 = y_momentum.iter().cloned().fold(f64::NAN, |m, v| v.max(m));
+    println!("y_momentum is {:?}", y_momentum);
+    println!("y_max is {:?}", y_max);
+
     for (i, val) in y_momentum.iter().enumerate() {
         if (*val - y_max) < 0.0001 {
             low.push(x[i])
