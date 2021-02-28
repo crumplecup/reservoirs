@@ -1,3 +1,5 @@
+use crate::errors;
+use serde::{Serialize, Deserialize};
 
 /// Estimate the cumulative distribution function (CDF) of a vector of observations.
 ///  - `x` is a reference to a slice of f64 values
@@ -124,4 +126,28 @@ pub fn quantiles(obs: &[f64]) -> Vec<f64> {
         quantile(obs, &0.975),
     ];
     quants
+}
+
+/// Read data from csv file.
+pub fn read_f64(path: &str) -> Result<Vec<f64>, errors::ResError> {
+    let mut dat = Vec::new();
+    let var = std::fs::File::open(path)?;
+    let mut rdr = csv::Reader::from_reader(var);
+    for result in rdr.records() {
+        let row = result?;
+        let row = row.deserialize(None)?;
+        dat.push(row);
+    }
+    Ok(dat)
+}
+
+
+/// Write statistical results to csv file.
+pub fn record<T: Serialize>(rec: &mut Vec<T>, path: &str) -> Result<(), errors::ResError> {
+    let mut wtr = csv::Writer::from_path(path)?;
+    for i in rec {
+        wtr.serialize(i)?;
+    }
+    wtr.flush()?;
+    Ok(())
 }

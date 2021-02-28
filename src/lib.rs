@@ -107,12 +107,14 @@ pub mod plot;
 pub mod reservoir;
 /// Basic utility functions, largely reinventing the wheel.
 pub mod utils;
+mod errors;
 
 /// Standard import of useful features of reservoirs.
 pub mod prelude {
     pub use crate::plot;
-    pub use crate::reservoir::{Model, ResError, Reservoir, Sample};
+    pub use crate::reservoir::{Model, Reservoir, Sample};
     pub use crate::utils;
+    pub use crate::errors::ResError;
 }
 
 #[cfg(test)]

@@ -1,6 +1,6 @@
 //! Structs and methods for Bolin & Rodhes reservoir models.
 use crate::utils;
-use crate::plot;
+use crate::errors;
 use rand::SeedableRng;
 use rand_distr::{Distribution, Exp};
 use rayon::prelude::*;
@@ -18,7 +18,7 @@ pub struct Gof {
 
 impl Gof {
     /// Convert csv record to Gof struct.
-    pub fn read(path: &str) -> Result<Vec<Gof>, ResError> {
+    pub fn read(path: &str) -> Result<Vec<Gof>, errors::ResError> {
         let mut gof = Vec::new();
         let var = std::fs::File::open(path)?;
         let mut rdr = csv::Reader::from_reader(var);
@@ -31,7 +31,7 @@ impl Gof {
     }
 
     /// Write statistical results to csv file.
-    pub fn record(rec: &mut Vec<Gof>, title: &str) -> Result<(), ResError> {
+    pub fn record(rec: &mut Vec<Gof>, title: &str) -> Result<(), errors::ResError> {
         let mut wtr = csv::Writer::from_path(title)?;
         for i in rec {
             wtr.serialize(i)?;
@@ -426,17 +426,31 @@ impl Model {
     }
 
     /// Fits range of rates to an observed distribution using a steady state reservoir.
-    pub fn search(&mut self, rate: std::ops::Range<f64>, obs: &[f64], path: &str) -> f64 {
+    pub fn search(&mut self, rate: std::ops::Range<f64>, obs: &[f64], path: &str) -> Result<(), errors::ResError> {
+        let dur = std::time::Duration::new(60 * 60 * self.duration, 0);
+        let now = std::time::SystemTime::now();
         let mut rec = Vec::new();
-        while rec.len() < (self.bins * self.mean_samples) {
-            let mut new = self.steady(rate.clone(), obs);
-            rec.append(&mut new);
-            println!("{}% complete.", (rec.len() as f64 / (self.bins * self.mean_samples) as f64 * 100.0).round());
+        let exists = std::path::Path::new(path).exists();
+        match exists {
+            true => {
+                let mut fits: Vec<f64> = utils::read_f64(path)?;
+                rec.append(&mut fits);
+            }
+            false => {}
         }
-        Gof::record(&mut rec, &*format!("{}{}", path, "rec.csv")).unwrap();
-        let (x, y) = Record::bin_ave(&rec, self.bins);
-        plot::xy(&x, &y, &*format!("{}{}", path, "rec.png")).unwrap();
-        utils::low_point(&x, &y)
+        while std::time::SystemTime::now() < now + dur {
+            let mut gof = Vec::new();
+            while gof.len() < (self.bins * self.mean_samples) {
+                let mut new = self.steady(rate.clone(), obs);
+                gof.append(&mut new);
+                // println!("{}% complete.", (rec.len() as f64 / (self.bins * self.mean_samples) as f64 * 100.0).round());
+            }
+            let (x, y) = Record::bin_ave(&gof, self.bins);
+            rec.push(utils::low_point(&x, &y));
+            utils::record(&mut rec, path)?;
+        }
+
+        Ok(())
     }
 
     /// Randomly selects a rate from ranges `rate` for a steady state reservoir,
@@ -704,50 +718,6 @@ pub struct Reservoir {
     range: rand::rngs::StdRng,
 }
 
-/// Custom error type for the reservoirs crate.
-#[derive(Debug)]
-pub enum ResError {
-    /// Error type from csv crate.
-    CsvError,
-    /// Error type from rand crate.
-    ExpError,
-    /// Error type from std::io.
-    IoError,
-}
-
-impl std::error::Error for ResError {}
-
-impl std::fmt::Display for ResError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            ResError::CsvError => write!(f, "Could not serialize/deserialize csv file."),
-            ResError::ExpError => write!(
-                f,
-                "Could not create exponential distribution from rate provided."
-            ),
-            ResError::IoError => write!(f, "Could not read file from path provided."),
-        }
-    }
-}
-
-impl From<csv::Error> for ResError {
-    fn from(_: csv::Error) -> Self {
-        ResError::CsvError
-    }
-}
-
-impl From<rand_distr::ExpError> for ResError {
-    fn from(_: rand_distr::ExpError) -> Self {
-        ResError::ExpError
-    }
-}
-
-impl From<std::io::Error> for ResError {
-    fn from(_: std::io::Error) -> Self {
-        ResError::IoError
-    }
-}
-
 impl Reservoir {
     /// Compare the accumulated mass in a reservoir to another record.
     /// Produces two goodness-of-fit statistics in a tuple:
@@ -836,7 +806,7 @@ impl Reservoir {
     /// use reservoirs::prelude::*;
     /// res = Reservoir::new().input(&0.58)?;
     /// ```
-    pub fn input(mut self, rate: &f64) -> Result<Self, ResError> {
+    pub fn input(mut self, rate: &f64) -> Result<Self, errors::ResError> {
         let rate = Exp::new(*rate)?;
         self.input = Some(rate);
         Ok(self)
@@ -871,7 +841,7 @@ impl Reservoir {
     /// use reservoirs::prelude::*;
     /// res = Reservoir::new().output(&0.58)?;
     /// ```
-    pub fn output(mut self, rate: &f64) -> Result<Self, ResError> {
+    pub fn output(mut self, rate: &f64) -> Result<Self, errors::ResError> {
         let rate = Exp::new(*rate)?;
         self.output = Some(rate);
         Ok(self)
@@ -911,7 +881,7 @@ impl Reservoir {
     /// gravels = gravels.sim(&30000.0)?;
     ///
     /// ```
-    pub fn sim(mut self, period: &f64) -> Result<Self, ResError> {
+    pub fn sim(mut self, period: &f64) -> Result<Self, errors::ResError> {
         let mut om = 0f64;
         let mut im = 0f64;
         let mut mass = Vec::new(); // time of arrivals in reservoir
@@ -982,7 +952,7 @@ pub struct Sample {
 
 impl Sample {
     /// Converts a csv file of charcoal ages into a Sample struct.
-    pub fn read(path: &str) -> Result<Vec<Sample>, ResError> {
+    pub fn read(path: &str) -> Result<Vec<Sample>, errors::ResError> {
         let mut record = Vec::new();
         let var = std::fs::File::open(path)?;
         let mut rdr = csv::Reader::from_reader(var);
@@ -1018,4 +988,5 @@ impl Record for Vec<Gof> {
         let fits: Vec<f64> = fits.chunks(chunk_ln).map(|x| utils::mean(&x)).collect();
         (rates, fits)
     }
+
 }
