@@ -19,7 +19,7 @@ impl Bbox {
             xmin,
             xmax,
             ymin,
-            ymax
+            ymax,
         }
     }
 }
@@ -32,7 +32,7 @@ pub fn xy(x: &[f64], y: &[f64], path: &str) -> Result<(), Box<dyn std::error::Er
     root.fill(&WHITE)?;
     root.margin(10, 10, 10, 10);
     let mut chart = ChartBuilder::on(&root)
-               // .caption("Title", ("sans-serif", 16).into_font())
+        // .caption("Title", ("sans-serif", 16).into_font())
         .x_label_area_size(40)
         .y_label_area_size(60)
         .build_cartesian_2d(bbox.xmin..bbox.xmax, bbox.ymin..bbox.ymax)?;
@@ -48,8 +48,6 @@ pub fn xy(x: &[f64], y: &[f64], path: &str) -> Result<(), Box<dyn std::error::Er
     chart.draw_series(xy.iter().map(|x| Circle::new((x.0, x.1), 2, BLUE.filled())))?;
 
     Ok(())
-
-
 }
 
 /// Compare the CDF of two accumulation records.

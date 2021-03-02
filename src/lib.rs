@@ -101,20 +101,20 @@
 #![feature(intra_doc_pointers)]
 #![warn(missing_docs)]
 #![forbid(unsafe_code)]
+mod errors;
 /// Plotting functions for reservoir models.
 pub mod plot;
 /// Structs and methods related to simulating reservoir models.
 pub mod reservoir;
 /// Basic utility functions, largely reinventing the wheel.
 pub mod utils;
-mod errors;
 
 /// Standard import of useful features of reservoirs.
 pub mod prelude {
+    pub use crate::errors::ResError;
     pub use crate::plot;
     pub use crate::reservoir::{Model, Reservoir, Sample};
     pub use crate::utils;
-    pub use crate::errors::ResError;
 }
 
 #[cfg(test)]

@@ -1,5 +1,16 @@
 use crate::errors;
-use serde::{Serialize, Deserialize};
+use rand::seq::IteratorRandom;
+use serde::{Deserialize, Serialize};
+
+/// Bootstrap a synthetic dataset from observed samples.
+pub fn bootstrap(obs: &[f64]) -> Vec<f64> {
+    let ln = obs.len();
+    let mut boot: Vec<f64> = Vec::with_capacity(ln);
+    for _ in 0..ln {
+        boot.push(obs.iter().cloned().choose(&mut rand::thread_rng()).unwrap());
+    }
+    boot
+}
 
 /// Estimate the cumulative distribution function (CDF) of a vector of observations.
 ///  - `x` is a reference to a slice of f64 values
@@ -44,13 +55,13 @@ pub fn cdf_bin(obs: &[f64], bins: usize) -> Vec<f64> {
 /// Calculates the low point along `y` and returns the value of `x` at the low point.
 pub fn low_point(x: &[f64], y: &[f64]) -> f64 {
     let mut y_slope: Vec<f64> = Vec::new();
-    for i in 0..(y.len()-1) {
-        y_slope.push(y[i+1] - y[i]);
+    for i in 0..(y.len() - 1) {
+        y_slope.push(y[i + 1] - y[i]);
     }
     let mut y_momentum: Vec<f64> = vec![y_slope.iter().sum::<f64>().abs()];
-    for i in 0..(y_slope.len()-1) {
-        let before: f64 = y_slope[0..(i+1)].iter().sum::<f64>().abs();
-        let after: f64 = y_slope[(i+1)..y_slope.len()].iter().sum::<f64>().abs();
+    for i in 0..(y_slope.len() - 1) {
+        let before: f64 = y_slope[0..(i + 1)].iter().sum::<f64>().abs();
+        let after: f64 = y_slope[(i + 1)..y_slope.len()].iter().sum::<f64>().abs();
         y_momentum.push(before + after);
     }
     y_momentum.push(y_slope.iter().sum::<f64>().abs());
@@ -61,7 +72,7 @@ pub fn low_point(x: &[f64], y: &[f64]) -> f64 {
             low.push(x[i])
         }
     }
-    low[low.len()-1]
+    low[low.len() - 1]
 }
 
 /// Calculate the mean of a slice of f64 values.
@@ -140,7 +151,6 @@ pub fn read_f64(path: &str) -> Result<Vec<f64>, errors::ResError> {
     }
     Ok(dat)
 }
-
 
 /// Write statistical results to csv file.
 pub fn record<T: Serialize>(rec: &mut Vec<T>, path: &str) -> Result<(), errors::ResError> {

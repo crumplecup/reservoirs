@@ -1,6 +1,6 @@
 //! Structs and methods for Bolin & Rodhes reservoir models.
-use crate::utils;
 use crate::errors;
+use crate::utils;
 use rand::SeedableRng;
 use rand_distr::{Distribution, Exp};
 use rayon::prelude::*;
@@ -46,6 +46,86 @@ impl Gof {
     }
 }
 
+/// Holds parameters for bootstrapping confidence intervals of reservoir models.
+#[derive(Clone, Debug)]
+pub struct Bootstrap {
+    model: Model,
+    bins: usize,
+    samples: usize,
+
+}
+
+impl Bootstrap {
+    /// Sets the model bin number for comparing ranges in [search](#method.search).
+    pub fn bins(mut self, size: usize) -> Self {
+        self.bins = size;
+        self
+    }
+
+    /// Creates a Bootstrap struct from a given Model.
+    pub fn new(model: Model) -> Self {
+        Bootstrap {
+            model,
+            bins: 100,
+            samples: 3
+        }
+    }
+
+
+    /// Sets the number of samples desired for calculating the mean in a range,
+    /// called by [search](#method.search).
+    pub fn samples(mut self, count: usize) -> Self {
+        self.samples = count;
+        self
+    }
+
+
+    /// Fits range of rates to an observed distribution using a steady state reservoir.
+    pub fn search(
+        &mut self,
+        rate: std::ops::Range<f64>,
+        obs: &[f64],
+        path: &str,
+    ) -> Result<(), errors::ResError> {
+        // initialize time variables
+        let dur = std::time::Duration::new(60 * 60 * self.model.duration, 0);
+        let now = std::time::SystemTime::now();
+        let mut rec = Vec::new();
+        // load existing record if any
+        let exists = std::path::Path::new(path).exists();
+        match exists {
+            true => {
+                let mut fits: Vec<f64> = utils::read_f64(path)?;
+                rec.append(&mut fits);
+            }
+            false => {}
+        }
+        // perform bootstrap
+        let mut count: usize = 0;
+        let rec_path = format!("{}{}", path, "rec.csv");
+        while std::time::SystemTime::now() < now + dur {
+            let mut gof = Vec::new();
+            let boot = utils::bootstrap(&obs);
+            while gof.len() < (self.bins * self.samples) {
+                let mut new = self.model.steady(rate.clone(), &boot);
+                gof.append(&mut new);
+                // println!("{}% complete.", (rec.len() as f64 / (self.bins * self.mean_samples) as f64 * 100.0).round());
+            }
+            let gof_path = format!("{}{}{}{}", path, "gof_", count, ".csv");
+            utils::record(&mut gof, &gof_path)?;
+            count += 1;
+            let (x, y) = Record::bin_ave(&gof, self.bins);
+            rec.push(utils::low_point(&x, &y));
+            utils::record(&mut rec, &rec_path)?;
+        }
+
+        Ok(())
+    }
+
+
+
+}
+
 /// Holds model characteristics associated with a reservoir.
 #[derive(Clone, Debug)]
 pub struct Model {
@@ -54,20 +134,12 @@ pub struct Model {
     runs: usize,
     batch: usize,
     duration: u64,
-    bins: usize,
-    mean_samples: usize,
 }
 
 impl Model {
     /// Sets the model batch size to desired number of samples.
     pub fn batch(mut self, samples: usize) -> Self {
         self.batch = samples;
-        self
-    }
-
-    /// Sets the model bin number for comparing ranges in [search](#method.search).
-    pub fn bins(mut self, size: usize) -> Self {
-        self.bins = size;
         self
     }
 
@@ -395,16 +467,7 @@ impl Model {
             runs: 100,
             batch: 10,
             duration: 1,
-            bins: 100,
-            mean_samples: 30,
         }
-    }
-
-    /// Sets the number of samples desired for calculating the mean in a range,
-    /// called by [search](#method.search).
-    pub fn mean_samples(mut self, samples: usize) -> Self {
-        self.mean_samples = samples;
-        self
     }
 
     /// Sets the model period to desired time in years.
@@ -425,33 +488,6 @@ impl Model {
         self
     }
 
-    /// Fits range of rates to an observed distribution using a steady state reservoir.
-    pub fn search(&mut self, rate: std::ops::Range<f64>, obs: &[f64], path: &str) -> Result<(), errors::ResError> {
-        let dur = std::time::Duration::new(60 * 60 * self.duration, 0);
-        let now = std::time::SystemTime::now();
-        let mut rec = Vec::new();
-        let exists = std::path::Path::new(path).exists();
-        match exists {
-            true => {
-                let mut fits: Vec<f64> = utils::read_f64(path)?;
-                rec.append(&mut fits);
-            }
-            false => {}
-        }
-        while std::time::SystemTime::now() < now + dur {
-            let mut gof = Vec::new();
-            while gof.len() < (self.bins * self.mean_samples) {
-                let mut new = self.steady(rate.clone(), obs);
-                gof.append(&mut new);
-                // println!("{}% complete.", (rec.len() as f64 / (self.bins * self.mean_samples) as f64 * 100.0).round());
-            }
-            let (x, y) = Record::bin_ave(&gof, self.bins);
-            rec.push(utils::low_point(&x, &y));
-            utils::record(&mut rec, path)?;
-        }
-
-        Ok(())
-    }
 
     /// Randomly selects a rate from ranges `rate` for a steady state reservoir,
     /// and simulates accumulation records
@@ -699,12 +735,9 @@ impl Default for Model {
             runs: 100,
             batch: 10,
             duration: 1,
-            bins: 100,
-            mean_samples: 30,
         }
     }
 }
-
 
 /// Struct for recording reservoir characteristics.
 #[derive(Clone, Debug)]
@@ -949,7 +982,6 @@ pub struct Sample {
     pub facies: String,
 }
 
-
 impl Sample {
     /// Converts a csv file of charcoal ages into a Sample struct.
     pub fn read(path: &str) -> Result<Vec<Sample>, errors::ResError> {
@@ -964,7 +996,6 @@ impl Sample {
         Ok(record)
     }
 }
-
 
 /// The Record trait indicates the data is organized in spreadsheet format with
 /// variables by column and observations by row (using struct fields as column names).
@@ -988,5 +1019,4 @@ impl Record for Vec<Gof> {
         let fits: Vec<f64> = fits.chunks(chunk_ln).map(|x| utils::mean(&x)).collect();
         (rates, fits)
     }
-
 }

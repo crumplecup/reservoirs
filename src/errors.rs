@@ -1,4 +1,3 @@
-
 /// Custom error type for the reservoirs crate.
 #[derive(Debug)]
 pub enum ResError {
