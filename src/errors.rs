@@ -7,6 +7,8 @@ pub enum ResError {
     ExpError,
     /// Error type from std::io.
     IoError,
+    /// Error type from Box<dyn StdError>
+    BoxError,
 }
 
 impl std::error::Error for ResError {}
@@ -20,6 +22,7 @@ impl std::fmt::Display for ResError {
                 "Could not create exponential distribution from rate provided."
             ),
             ResError::IoError => write!(f, "Could not read file from path provided."),
+            ResError::BoxError => write!(f, "Maybe a plot error."),
         }
     }
 }
@@ -39,5 +42,11 @@ impl From<rand_distr::ExpError> for ResError {
 impl From<std::io::Error> for ResError {
     fn from(_: std::io::Error) -> Self {
         ResError::IoError
+    }
+}
+
+impl From<Box<dyn serde::de::StdError>> for ResError {
+    fn from(_: Box<dyn serde::de::StdError>) -> Self {
+        ResError::BoxError
     }
 }

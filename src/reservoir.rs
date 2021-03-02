@@ -1,6 +1,7 @@
 //! Structs and methods for Bolin & Rodhes reservoir models.
 use crate::errors;
 use crate::utils;
+use crate::plot;
 use rand::SeedableRng;
 use rand_distr::{Distribution, Exp};
 use rayon::prelude::*;
@@ -112,9 +113,11 @@ impl Bootstrap {
                 // println!("{}% complete.", (rec.len() as f64 / (self.bins * self.mean_samples) as f64 * 100.0).round());
             }
             let gof_path = format!("{}{}{}{}", path, "gof_", count, ".csv");
+            let png_path = format!("{}{}{}{}", path, "gof_", count, ".png");
             utils::record(&mut gof, &gof_path)?;
             count += 1;
             let (x, y) = Record::bin_ave(&gof, self.bins);
+            plot::xy(&x, &y, &png_path)?;
             rec.push(utils::low_point(&x, &y));
             utils::record(&mut rec, &rec_path)?;
         }
