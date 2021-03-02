@@ -113,7 +113,6 @@ impl Bootstrap {
                 // println!("{}% complete.", (rec.len() as f64 / (self.bins * self.mean_samples) as f64 * 100.0).round());
             }
             let gof_path = format!("{}{}{}{}", path, "gof_", count, ".csv");
-            println!("{}", gof_path);
             let png_path = format!("{}{}{}{}", path, "gof_", count, ".png");
             utils::record(&mut gof, &gof_path)?;
             count += 1;
