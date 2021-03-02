@@ -1,7 +1,7 @@
 //! Structs and methods for Bolin & Rodhes reservoir models.
 use crate::errors;
-use crate::utils;
 use crate::plot;
+use crate::utils;
 use rand::SeedableRng;
 use rand_distr::{Distribution, Exp};
 use rayon::prelude::*;
@@ -53,7 +53,6 @@ pub struct Bootstrap {
     model: Model,
     bins: usize,
     samples: usize,
-
 }
 
 impl Bootstrap {
@@ -68,10 +67,9 @@ impl Bootstrap {
         Bootstrap {
             model,
             bins: 100,
-            samples: 3
+            samples: 3,
         }
     }
-
 
     /// Sets the number of samples desired for calculating the mean in a range,
     /// called by [search](#method.search).
@@ -79,7 +77,6 @@ impl Bootstrap {
         self.samples = count;
         self
     }
-
 
     /// Fits range of rates to an observed distribution using a steady state reservoir.
     pub fn search(
@@ -110,7 +107,10 @@ impl Bootstrap {
             while gof.len() < (self.bins * self.samples) {
                 let mut new = self.model.steady(rate.clone(), &boot);
                 gof.append(&mut new);
-                // println!("{}% complete.", (rec.len() as f64 / (self.bins * self.mean_samples) as f64 * 100.0).round());
+                println!(
+                    "{}% complete.",
+                    (rec.len() as f64 / (self.bins * self.samples) as f64 * 100.0).round()
+                );
             }
             let gof_path = format!("{}{}{}{}", path, "gof_", count, ".csv");
             let png_path = format!("{}{}{}{}", path, "gof_", count, ".png");
@@ -124,9 +124,6 @@ impl Bootstrap {
 
         Ok(())
     }
-
-
-
 }
 
 /// Holds model characteristics associated with a reservoir.
@@ -490,7 +487,6 @@ impl Model {
         self.runs = times;
         self
     }
-
 
     /// Randomly selects a rate from ranges `rate` for a steady state reservoir,
     /// and simulates accumulation records
