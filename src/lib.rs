@@ -113,7 +113,7 @@ pub mod utils;
 pub mod prelude {
     pub use crate::errors::ResError;
     pub use crate::plot;
-    pub use crate::reservoir::{Model, Reservoir, Sample};
+    pub use crate::reservoir::{Bootstrap, Model, Reservoir, Sample};
     pub use crate::utils;
 }
 
