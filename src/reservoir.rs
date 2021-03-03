@@ -109,7 +109,7 @@ impl Bootstrap {
                 gof.append(&mut new);
                 println!(
                     "{}% complete.",
-                    (rec.len() as f64 / (self.bins * self.samples) as f64 * 100.0).round()
+                    (gof.len() as f64 / (self.bins * self.samples) as f64 * 100.0).round()
                 );
             }
             let gof_path = format!("{}{}{}{}", path, "gof_", count, ".csv");
