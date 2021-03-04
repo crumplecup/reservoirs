@@ -98,7 +98,6 @@
 *
 * ```
 */
-#![feature(intra_doc_pointers)]
 #![warn(missing_docs)]
 #![forbid(unsafe_code)]
 mod errors;
