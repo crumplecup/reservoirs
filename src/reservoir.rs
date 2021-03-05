@@ -850,6 +850,7 @@ impl Reservoir {
         x.append(&mut y);
         x.sort_by(|a, b| a.partial_cmp(b).unwrap());
         x.dedup();
+        let k = x.len(); // for AD test later
         // construct cdf of each
         let mut cdf = Vec::new();
         for i in x {
@@ -860,16 +861,13 @@ impl Reservoir {
             cdf.push((resx, resy));
         }
         // anderson-darling test
-        let k = cdf.len();
         let k64 = k as f64;
         let cdf1: Vec<f64> = cdf.iter().take(k - 1).map(|x| x.0).collect();
         let mut adi = Vec::new();
         for (i, val) in cdf1.iter().enumerate() {
             let i64 = i as f64;
             let ad_i = f64::powi((k64 * val) - (lnx * i64), 2) / (i64 * (k64 - i64));
-            if !ad_i.is_nan(){
-                adi.push(ad_i);
-            }
+            adi.push(ad_i);
         }
         let mut ad = adi.iter().sum::<f64>();
         ad /= lnx * lny;
