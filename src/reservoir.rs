@@ -867,7 +867,9 @@ impl Reservoir {
         for (i, val) in cdf1.iter().enumerate() {
             let i64 = i as f64;
             let ad_i = f64::powi((k64 * val) - (lnx * i64), 2) / (i64 * (k64 - i64));
-            adi.push(ad_i);
+            if !ad_i.is_nan(){
+                adi.push(ad_i);
+            }
         }
         let mut ad = adi.iter().sum::<f64>();
         ad /= lnx * lny;
