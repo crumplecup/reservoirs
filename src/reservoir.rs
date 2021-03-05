@@ -7,13 +7,36 @@ use rand_distr::{Distribution, Exp};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
+/// Holder struct for passing test values between functions.
+/// Makes functions calls and returns less confusing.
+#[derive(Clone, Debug)]
+pub struct Fit {
+    ad: f64,
+    ada: f64,
+    chs: f64,
+    kp: f64,
+    ks: f64,
+    ksa: f64,
+}
+
+/// Summary statistics for several Fit objects.
+#[derive(Clone, Debug)]
+pub struct Fits {
+    fit: Fit,
+    n: f64,
+}
+
 /// Holder struct for goodness-of-fit statistics.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Gof {
     input: f64,
     output: f64,
-    ks: f64,
+    ad: f64,
+    ada: f64,
+    chs: f64,
     kp: f64,
+    ks: f64,
+    ksa: f64,
     n: f64,
 }
 
@@ -42,8 +65,18 @@ impl Gof {
     }
 
     /// Get the values associated with fields of the struct.
-    pub fn values(&self) -> (f64, f64, f64, f64, f64) {
-        (self.input, self.output, self.ks, self.kp, self.n)
+    pub fn values(&self) -> (f64, f64, f64, f64, f64, f64, f64, f64, f64) {
+        (
+            self.input,
+            self.output,
+            self.ad,
+            self.ada,
+            self.chs,
+            self.kp,
+            self.ks,
+            self.ksa,
+            self.n,
+        )
     }
 }
 
@@ -303,15 +336,19 @@ impl Model {
                 ),
             );
         }
-        let gof: Vec<(f64, f64, f64)> = fits.par_iter().map(|x| x.clone().fit_rate(&obs)).collect();
+        let gof: Vec<Fits> = fits.par_iter().map(|x| x.clone().fit_rate(&obs)).collect();
         let mut gofs = Vec::with_capacity(self.batch);
         for i in 0..self.batch {
             gofs.push(Gof {
                 input: inputs[i],
                 output: outputs[i],
-                ks: gof[i].0,
-                kp: gof[i].1,
-                n: gof[i].2,
+                ad: gof[i].fit.ad,
+                ada: gof[i].fit.ada,
+                chs: gof[i].fit.chs,
+                kp: gof[i].fit.kp,
+                ks: gof[i].fit.ks,
+                ksa: gof[i].fit.ksa,
+                n: gof[i].n,
             })
         }
         gofs
@@ -363,7 +400,7 @@ impl Model {
     /// println!("K-S fit is {}.", ks);
     /// println!("Kuiper fit is {}.", kp);
     /// ```
-    pub fn fit_rate(&mut self, other: &[f64]) -> (f64, f64, f64) {
+    pub fn fit_rate(&mut self, other: &[f64]) -> Fits {
         let mut res: Vec<Reservoir> = Vec::with_capacity(self.runs);
         let seeder: rand::distributions::Uniform<u64> =
             rand::distributions::Uniform::new(0, 10000000);
@@ -379,12 +416,33 @@ impl Model {
             .cloned()
             .map(|x| x.sim(&self.period).unwrap())
             .collect();
-        let fits: Vec<(f64, f64)> = res.par_iter().cloned().map(|x| x.gof(other)).collect();
-        let kss: Vec<f64> = fits.par_iter().map(|x| x.0).collect();
-        let kps: Vec<f64> = fits.par_iter().map(|x| x.1).collect();
+        let fits: Vec<Fit> = res.par_iter().cloned().map(|x| x.gof(other)).collect();
+        let ads: Vec<f64> = fits.iter().map(|x| x.ad).collect();
+        let ad = utils::median(&ads);
+        let adas: Vec<f64> = fits.iter().map(|x| x.ada).collect();
+        let ada = utils::median(&adas);
+        let chss: Vec<f64> = fits.iter().map(|x| x.chs).collect();
+        let chs = utils::median(&chss);
+        let kps: Vec<f64> = fits.iter().map(|x| x.kp).collect();
+        let kp = utils::median(&kps);
+        let kss: Vec<f64> = fits.iter().map(|x| x.ks).collect();
+        let ks = utils::median(&kss);
+        let ksas: Vec<f64> = fits.iter().map(|x| x.ksa).collect();
+        let ksa = utils::median(&ksas);
         let ns: Vec<f64> = res.iter().map(|x| x.mass.len() as f64).collect();
+        let n = utils::median(&ns);
 
-        (utils::mean(&kss), utils::median(&kps), utils::mean(&ns))
+        Fits {
+            fit: Fit {
+                ad,
+                ada,
+                chs,
+                kp,
+                ks,
+                ksa,
+            },
+            n,
+        }
     }
 
     /// Fits a range of steady state reservoirs to an observed accumulation record.
@@ -552,15 +610,19 @@ impl Model {
                 ),
             );
         }
-        let gof: Vec<(f64, f64, f64)> = fits.par_iter().map(|x| x.clone().fit_rate(&obs)).collect();
+        let gof: Vec<Fits> = fits.par_iter().map(|x| x.clone().fit_rate(&obs)).collect();
         let mut gofs = Vec::with_capacity(self.batch);
         for i in 0..self.batch {
             gofs.push(Gof {
                 input: rates[i],
                 output: rates[i],
-                ks: gof[i].0,
-                kp: gof[i].1,
-                n: gof[i].2,
+                ad: gof[i].fit.ad,
+                ada: gof[i].fit.ada,
+                chs: gof[i].fit.chs,
+                kp: gof[i].fit.kp,
+                ks: gof[i].fit.ks,
+                ksa: gof[i].fit.ksa,
+                n: gof[i].n,
             })
         }
         gofs
@@ -652,8 +714,8 @@ impl Model {
         let cdf = utils::cdf_bin(&rec, bins); // subsample vector to length bins
 
         // TODO:  parallelize
-        let gof: Vec<(f64, f64)> = res.par_iter().cloned().map(|x| x.gof(&cdf)).collect(); // ks and kp values
-        let ks: Vec<f64> = gof.par_iter().cloned().map(|x| x.0).collect(); // clip to just ks values
+        let gof: Vec<Fit> = res.par_iter().cloned().map(|x| x.gof(&cdf)).collect(); // ks and kp values
+        let ks: Vec<f64> = gof.par_iter().cloned().map(|x| x.ks).collect(); // clip to just ks values
         let mut least = 1.0; // test for lowest fit (set to high value)
         let mut low = Reservoir::new(); // initialize variable to hold lowest fit
         for (i, val) in ns.iter().enumerate() {
@@ -777,16 +839,18 @@ impl Reservoir {
     /// println!("Kuiper fit is {}.", kp);
     ///
     /// ```
-    pub fn gof(&self, other: &[f64]) -> (f64, f64) {
+    pub fn gof(&self, other: &[f64]) -> Fit {
+        // join the two vectors, sort and deduplicate
         let mut x = self.mass.clone();
         let mut y = other.to_vec();
-        let lnx = x.len() as f64;
+        let lnx = x.len() as f64; // note the original lengths
         let lny = y.len() as f64;
-        let xo = x.clone();
+        let xo = x.clone(); // clone the originals for later use
         let yo = y.clone();
         x.append(&mut y);
         x.sort_by(|a, b| a.partial_cmp(b).unwrap());
         x.dedup();
+        // construct cdf of each
         let mut cdf = Vec::new();
         for i in x {
             let numx: Vec<&f64> = xo.iter().filter(|z| **z <= i).collect();
@@ -795,14 +859,41 @@ impl Reservoir {
             let resy = numy.len() as f64 / lny;
             cdf.push((resx, resy));
         }
+        // anderson-darling test
+        let k = cdf.len();
+        let k64 = k as f64;
+        let cdf1: Vec<f64> = cdf.iter().take(k - 1).map(|x| x.0).collect();
+        let mut adi: Vec<f64> = Vec::new();
+        for (i, val) in cdf1.iter().enumerate() {
+            let i64 = i as f64;
+            adi.push(f64::powf(k64 * val - lnx * i64, 2.0) / (i64 * (k64 - i64)));
+        }
+        let mut ad = adi.iter().sum::<f64>();
+        ad /= lnx * lny;
+        let ada = (2.492 - 1.0) * (1.0 - (1.55 / k as f64)) + 1.0;
+        // chi-squared pearsons test
+        let chs = cdf
+            .iter()
+            .map(|x| f64::powf(x.1 - x.0, 2.0) / x.0)
+            .sum::<f64>();
+        // kuiper test
+        let kp1 = cdf.iter().map(|x| x.0 - x.1).fold(0.0, f64::max);
+        let kp2 = cdf.iter().map(|x| x.1 - x.0).fold(0.0, f64::max);
+        let kp = kp1 + kp2;
+        // kolmogorov-smirnov test
         let ks = cdf
             .iter()
             .map(|x| rand_distr::num_traits::abs(x.0 - x.1))
             .fold(0.0, f64::max);
-        let kp1 = cdf.iter().map(|x| x.0 - x.1).fold(0.0, f64::max);
-        let kp2 = cdf.iter().map(|x| x.1 - x.0).fold(0.0, f64::max);
-        let kp = kp1 + kp2;
-        (ks, kp)
+        let ksa = 1.35810 * f64::sqrt((lnx + lny) / (lnx * lny)); // k-s crit value at 0.05
+        Fit {
+            ad,
+            ada,
+            chs,
+            kp,
+            ks,
+            ksa,
+        }
     }
 
     /// Inherited age refers to age of charcoal upon entering the reservoir.

@@ -1,6 +1,6 @@
 use crate::errors;
 use rand::seq::IteratorRandom;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 /// Bootstrap a synthetic dataset from observed samples.
 pub fn bootstrap(obs: &[f64]) -> Vec<f64> {
