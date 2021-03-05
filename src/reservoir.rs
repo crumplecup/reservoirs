@@ -871,6 +871,7 @@ impl Reservoir {
                 adi.push(ad_i);
             }
         }
+        println!("lost ad values {}", k - adi.len());
         let mut ad = adi.iter().sum::<f64>();
         ad /= lnx * lny;
         let ada = (2.492 - 1.0) * (1.0 - (1.55 / k as f64)) + 1.0;
