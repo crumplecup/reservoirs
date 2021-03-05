@@ -866,7 +866,7 @@ impl Reservoir {
         let mut adi: Vec<f64> = Vec::new();
         for (i, val) in cdf1.iter().enumerate() {
             let i64 = i as f64;
-            adi.push(f64::powf(k64 * val - lnx * i64, 2.0) / (i64 * (k64 - i64)));
+            adi.push(f64::powi(k64 * val - lnx * i64, 2) / (i64 * (k64 - i64)));
         }
         let mut ad = adi.iter().sum::<f64>();
         ad /= lnx * lny;
@@ -874,7 +874,8 @@ impl Reservoir {
         // chi-squared pearsons test
         let chs = cdf
             .iter()
-            .map(|x| f64::powf(x.1 - x.0, 2.0) / x.0)
+            .filter(|x|x.0 > 0.0)
+            .map(|x| f64::powi(x.1 - x.0, 2) / x.0)
             .sum::<f64>();
         // kuiper test
         let kp1 = cdf.iter().map(|x| x.0 - x.1).fold(0.0, f64::max);
