@@ -866,7 +866,7 @@ impl Reservoir {
         let mut adi = Vec::new();
         for (i, val) in cdf1.iter().enumerate() {
             let i64 = i as f64;
-            let ad_i = f64::powi(k64 * val - lnx * i64, 2) / (i64 * (k64 - i64));
+            let ad_i = f64::powi((k64 * val) - (lnx * i64), 2) / (i64 * (k64 - i64));
             if !ad_i.is_nan(){
                 adi.push(ad_i);
             }
