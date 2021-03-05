@@ -105,11 +105,13 @@ pub fn mean(numbers: &[f64]) -> f64 {
 /// ```
 pub fn median(numbers: &[f64]) -> f64 {
     let len = numbers.len();
+    let mut x: Vec<f64> = numbers.to_vec();
+    x.sort_by(|a, b| a.partial_cmp(b).unwrap());
     let mid = len / 2;
     if len % 2 == 0 {
-        mean(&numbers[(mid - 1)..(mid + 1)].to_vec())
+        mean(&x[(mid - 1)..(mid + 1)].to_vec())
     } else {
-        numbers[mid]
+        x[mid]
     }
 }
 
