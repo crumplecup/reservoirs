@@ -2,6 +2,27 @@ use crate::errors;
 use rand::seq::IteratorRandom;
 use serde::Serialize;
 
+/// Anderson-Darling Test
+pub fn ad(synth: &[f64], other: &[f64]) -> f64 {
+    let lnx = synth.len();
+    let lny = other.len();
+    let k64 = (lnx + lny) as f64;
+    let cdf = cdf_dual(synth, other);
+    let cdf1: Vec<f64> = cdf.iter().take(lnx + lny - 1).map(|x| x.0).collect();
+    let mut adi = Vec::new();
+    for (i, val) in cdf1.iter().enumerate() {
+        let i64 = i as f64;
+        let ad_i = f64::powi((k64 * val) - (lnx as f64 * i64), 2) / (i64 * (k64 - i64));
+        if !ad_i.is_nan() {
+            adi.push(ad_i);
+        }
+    }
+    println!("lost ad values {}", lnx + lny - adi.len());
+    let mut ad = adi.iter().sum::<f64>();
+    ad /= (lnx * lny) as f64;
+    ad
+}
+
 /// Bootstrap a synthetic dataset from observed samples.
 pub fn bootstrap(obs: &[f64]) -> Vec<f64> {
     let ln = obs.len();
@@ -50,6 +71,30 @@ pub fn cdf_bin(obs: &[f64], bins: usize) -> Vec<f64> {
         cdf_bin.push(res_max);
     }
     cdf_bin
+}
+
+/// Appends one vector to another and generates the CDF of observations.
+pub fn cdf_dual(obs: &[f64], other: &[f64]) -> Vec<(f64, f64)> {
+    // join the two vectors, sort and deduplicate
+    let mut x = obs.to_vec();
+    let mut y = other.to_vec();
+    let lnx = x.len() as f64; // note the original lengths
+    let lny = y.len() as f64;
+    let xo = x.clone(); // clone the originals for later use
+    let yo = y.clone();
+    x.append(&mut y);
+    x.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    x.dedup();
+    // construct cdf of each
+    let mut cdf = Vec::new();
+    for i in x {
+        let numx: Vec<&f64> = xo.iter().filter(|z| **z <= i).collect();
+        let numy: Vec<&f64> = yo.iter().filter(|z| **z <= i).collect();
+        let resx = numx.len() as f64 / lnx;
+        let resy = numy.len() as f64 / lny;
+        cdf.push((resx, resy));
+    }
+    cdf
 }
 
 /// Calculates the low point along `y` and returns the value of `x` at the low point.

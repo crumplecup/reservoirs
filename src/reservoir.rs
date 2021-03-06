@@ -851,7 +851,7 @@ impl Reservoir {
         x.sort_by(|a, b| a.partial_cmp(b).unwrap());
         x.dedup();
         let k = x.len(); // for AD test later
-        // construct cdf of each
+                         // construct cdf of each
         let mut cdf = Vec::new();
         for i in x {
             let numx: Vec<&f64> = xo.iter().filter(|z| **z <= i).collect();
@@ -867,7 +867,7 @@ impl Reservoir {
         for (i, val) in cdf1.iter().enumerate() {
             let i64 = i as f64;
             let ad_i = f64::powi((k64 * val) - (lnx * i64), 2) / (i64 * (k64 - i64));
-            if !ad_i.is_nan(){
+            if !ad_i.is_nan() {
                 adi.push(ad_i);
             }
         }
@@ -878,7 +878,7 @@ impl Reservoir {
         // chi-squared pearsons test
         let chs = cdf
             .iter()
-            .filter(|x|x.0 > 0.0)
+            .filter(|x| x.0 > 0.0)
             .map(|x| f64::powi(x.1 - x.0, 2) / x.0)
             .sum::<f64>();
         // kuiper test
