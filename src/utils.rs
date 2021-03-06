@@ -5,18 +5,25 @@ use serde::Serialize;
 /// Anderson-Darling Test
 pub fn ad(synth: &[f64], other: &[f64]) -> f64 {
     let lnx = synth.len();
+    println!("lnx is {}", lnx);
     let lny = other.len();
+    println!("lny is {}", lny);
     let k64 = (lnx + lny) as f64;
+    println!("k is {}", k64);
     let cdf = cdf_dual(synth, other);
+    println!("cdf is {:?}", cdf);
     let cdf1: Vec<f64> = cdf.iter().take(lnx + lny - 1).map(|x| x.0 * lnx as f64).collect();
+    println!("cdf prime is {:?}", cdf1);
     let mut adi = Vec::new();
     for (i, val) in cdf1.iter().enumerate() {
         let i64 = i as f64;
         let ad_i = f64::powi((k64 * val) - (lnx as f64 * i64), 2) / (i64 * (k64 - i64));
+        println!("ad is {}", ad_i);
         if !ad_i.is_nan() {
             adi.push(ad_i);
         }
     }
+    println!("adi is {:?}", adi);
     println!("lost ad values {}", lnx + lny - adi.len());
     let mut ad = adi.iter().sum::<f64>();
     ad /= (lnx * lny) as f64;
