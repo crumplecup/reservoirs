@@ -3,27 +3,26 @@ use rand::seq::IteratorRandom;
 use serde::Serialize;
 
 /// Anderson-Darling Test
-pub fn ad(synth: &[f64], other: &[f64]) -> f64 {
+pub fn ad_dual(synth: &[f64], other: &[f64]) -> f64 {
+    // join the two vectors and sort
+    let mut x = synth.to_vec();
+    let mut y = other.to_vec();
+    let xo = x.clone(); // clone the originals for later use
+    let yo = y.clone();
+    x.append(&mut y);
+    x.sort_by(|a, b| a.partial_cmp(b).unwrap());
     let lnx = synth.len();
-    println!("lnx is {}", lnx);
     let lny = other.len();
-    println!("lny is {}", lny);
-    let k64 = (lnx + lny) as f64;
-    println!("k is {}", k64);
-    let cdf = cdf_dual(synth, other);
-    println!("cdf is {:?}", cdf);
-    let cdf1: Vec<f64> = cdf.iter().take(lnx + lny - 1).map(|x| x.0 * lnx as f64).collect();
-    println!("cdf prime is {:?}", cdf1);
+    assert_eq!(x.len(), synth.len() + other.len());
+    let k = (lnx + lny) as f64;
     let mut adi = Vec::new();
-    for (i, val) in cdf1.iter().enumerate() {
-        let i64 = i as f64;
-        let ad_i = f64::powi((k64 * val) - (lnx as f64 * i64), 2) / (i64 * (k64 - i64));
-        println!("ad is {}", ad_i);
-        if !ad_i.is_nan() {
-            adi.push(ad_i);
-        }
+    for i in x {
+        let ad_i: Vec<f64> = synth.iter().filter(|z| **z <= i).map(|z| *z).collect();
+        println!("ad is {:?}", ad_i);
+        adi.push(ad_i.len() as f64);
     }
     println!("adi is {:?}", adi);
+
     println!("lost ad values {}", lnx + lny - adi.len());
     let mut ad = adi.iter().sum::<f64>();
     ad /= (lnx * lny) as f64;
