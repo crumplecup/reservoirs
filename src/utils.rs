@@ -7,22 +7,24 @@ pub fn ad_dual(synth: &[f64], other: &[f64]) -> f64 {
     // join the two vectors and sort
     let mut x = synth.to_vec();
     let mut y = other.to_vec();
-    let xo = x.clone(); // clone the originals for later use
-    let yo = y.clone();
     x.append(&mut y);
     x.sort_by(|a, b| a.partial_cmp(b).unwrap());
     let lnx = synth.len();
     let lny = other.len();
     assert_eq!(x.len(), synth.len() + other.len());
-    let k = (lnx + lny) as f64;
-    let mut adi = Vec::new();
+    let k = lnx + lny;
+    let mut ad_i = Vec::new();
     for i in x {
-        let ad_i: Vec<f64> = synth.iter().filter(|z| **z <= i).map(|z| *z).collect();
-        println!("ad is {:?}", ad_i);
-        adi.push(ad_i.len() as f64);
+        let step: Vec<f64> = synth.iter().filter(|z| **z <= i).map(|z| *z).collect();
+        ad_i.push(step.len() as f64);
+    }
+    let mut adi = Vec::new();
+
+    for (i, val) in ad_i.iter().take(k - 1).enumerate() {
+        let step = f64::powi((k as f64 * val) - (lnx * i) as f64, 2) / (i * (k - i)) as f64;
+        adi.push(step);
     }
     println!("adi is {:?}", adi);
-
     println!("lost ad values {}", lnx + lny - adi.len());
     let mut ad = adi.iter().sum::<f64>();
     ad /= (lnx * lny) as f64;
