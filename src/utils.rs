@@ -21,7 +21,7 @@ pub fn ad_dual(synth: &[f64], other: &[f64]) -> f64 {
     let mut adi = Vec::new();
 
     for (i, val) in ad_i.iter().take(k - 1).enumerate() {
-        let step = f64::powi((k as f64 * val) - (lnx * i) as f64, 2) / (i * (k - i)) as f64;
+        let step = f64::powi((k as f64 * val) - (lnx * (i+1)) as f64, 2) / ((i+1) * (k - (i+1))) as f64;
         adi.push(step);
     }
     println!("adi is {:?}", adi);
