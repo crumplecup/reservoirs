@@ -8,7 +8,7 @@ pub fn ad(synth: &[f64], other: &[f64]) -> f64 {
     let lny = other.len();
     let k64 = (lnx + lny) as f64;
     let cdf = cdf_dual(synth, other);
-    let cdf1: Vec<f64> = cdf.iter().take(lnx + lny - 1).map(|x| x.0).collect();
+    let cdf1: Vec<f64> = cdf.iter().take(lnx + lny - 1).map(|x| x.0 * lnx as f64).collect();
     let mut adi = Vec::new();
     for (i, val) in cdf1.iter().enumerate() {
         let i64 = i as f64;

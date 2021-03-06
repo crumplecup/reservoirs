@@ -862,7 +862,7 @@ impl Reservoir {
         }
         // anderson-darling test
         let k64 = k as f64;
-        let cdf1: Vec<f64> = cdf.iter().take(k - 1).map(|x| x.0).collect();
+        let cdf1: Vec<f64> = cdf.iter().take(k - 1).map(|x| x.0 * lnx).collect();
         let mut adi = Vec::new();
         for (i, val) in cdf1.iter().enumerate() {
             let i64 = i as f64;
@@ -874,7 +874,7 @@ impl Reservoir {
         println!("lost ad values {}", k - adi.len());
         let mut ad = adi.iter().sum::<f64>();
         ad /= lnx * lny;
-        let ada = (2.492 - 1.0) * (1.0 - (1.55 / k as f64)) + 1.0;
+        let ada = (2.492 - 1.0) * (1.0 - (1.55 / k64)) + 1.0;
         // chi-squared pearsons test
         let chs = cdf
             .iter()
