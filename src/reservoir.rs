@@ -840,41 +840,13 @@ impl Reservoir {
     ///
     /// ```
     pub fn gof(&self, other: &[f64]) -> Fit {
-        // join the two vectors, sort and deduplicate
-        let mut x = self.mass.clone();
-        let mut y = other.to_vec();
-        let lnx = x.len() as f64; // note the original lengths
-        let lny = y.len() as f64;
-        let xo = x.clone(); // clone the originals for later use
-        let yo = y.clone();
-        x.append(&mut y);
-        x.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        x.dedup();
-        let k = x.len(); // for AD test later
-                         // construct cdf of each
-        let mut cdf = Vec::new();
-        for i in x {
-            let numx: Vec<&f64> = xo.iter().filter(|z| **z <= i).collect();
-            let numy: Vec<&f64> = yo.iter().filter(|z| **z <= i).collect();
-            let resx = numx.len() as f64 / lnx;
-            let resy = numy.len() as f64 / lny;
-            cdf.push((resx, resy));
-        }
+        let cdf = utils::cdf_dual(&self.mass, other);
+        let ad = utils::ad_dual(&self.mass, other);
         // anderson-darling test
-        let k64 = k as f64;
-        let cdf1: Vec<f64> = cdf.iter().take(k - 1).map(|x| x.0 * lnx).collect();
-        let mut adi = Vec::new();
-        for (i, val) in cdf1.iter().enumerate() {
-            let i64 = i as f64;
-            let ad_i = f64::powi((k64 * val) - (lnx * i64), 2) / (i64 * (k64 - i64));
-            if !ad_i.is_nan() {
-                adi.push(ad_i);
-            }
-        }
-        println!("lost ad values {}", k - adi.len());
-        let mut ad = adi.iter().sum::<f64>();
-        ad /= lnx * lny;
-        let ada = (2.492 - 1.0) * (1.0 - (1.55 / k64)) + 1.0;
+        let lnx = self.mass.len();
+        let lny = other.len();
+        let k = lnx + lny;
+        let ada = (2.492 - 1.0) * (1.0 - (1.55 / k as f64)) + 1.0;
         // chi-squared pearsons test
         let chs = cdf
             .iter()
@@ -890,7 +862,7 @@ impl Reservoir {
             .iter()
             .map(|x| rand_distr::num_traits::abs(x.0 - x.1))
             .fold(0.0, f64::max);
-        let ksa = 1.35810 * f64::sqrt((lnx + lny) / (lnx * lny)); // k-s crit value at 0.05
+        let ksa = 1.35810 * f64::sqrt(k as f64 / (lnx * lny) as f64); // k-s crit value at 0.05
         Fit {
             ad,
             ada,

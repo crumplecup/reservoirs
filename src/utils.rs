@@ -2,20 +2,19 @@ use crate::errors;
 use rand::seq::IteratorRandom;
 use serde::Serialize;
 
-/// Anderson-Darling Test
-pub fn ad_dual(synth: &[f64], other: &[f64]) -> f64 {
+/// Anderson-Darling Two-Sample Test
+pub fn ad_dual(sample: &[f64], other: &[f64]) -> f64 {
     // join the two vectors and sort
-    let mut x = synth.to_vec();
+    let mut x = sample.to_vec();
     let mut y = other.to_vec();
     x.append(&mut y);
     x.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    let lnx = synth.len();
+    let lnx = sample.len();
     let lny = other.len();
-    assert_eq!(x.len(), synth.len() + other.len());
     let k = lnx + lny;
     let mut ad_i = Vec::new();
     for i in x {
-        let step: Vec<f64> = synth.iter().filter(|z| **z <= i).map(|z| *z).collect();
+        let step: Vec<f64> = sample.iter().filter(|z| **z <= i).map(|z| *z).collect();
         ad_i.push(step.len() as f64);
     }
     let mut adi = Vec::new();
@@ -24,8 +23,6 @@ pub fn ad_dual(synth: &[f64], other: &[f64]) -> f64 {
         let step = f64::powi((k as f64 * val) - (lnx * (i+1)) as f64, 2) / ((i+1) * (k - (i+1))) as f64;
         adi.push(step);
     }
-    println!("adi is {:?}", adi);
-    println!("lost ad values {}", lnx + lny - adi.len());
     let mut ad = adi.iter().sum::<f64>();
     ad /= (lnx * lny) as f64;
     ad
