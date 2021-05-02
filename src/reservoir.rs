@@ -171,6 +171,7 @@ pub struct Model {
     runs: usize,
     batch: usize,
     duration: u64,
+    range: i32,
 }
 
 impl Model {
@@ -540,12 +541,19 @@ impl Model {
             runs: 100,
             batch: 10,
             duration: 1,
+            range: 10000,
         }
     }
 
     /// Sets the model period to desired time in years.
     pub fn period(mut self, years: &f64) -> Self {
         self.period = years.to_owned();
+        self
+    }
+
+    /// Sets the number of runs per sample to estimate goodness-of-fit.
+    pub fn range(mut self, limit: i32) -> Self {
+        self.range = limit;
         self
     }
 
@@ -765,21 +773,21 @@ impl Model {
     /// let period: f64 = 2000.0;  // length of time to simulate accumulation in the reservoir in years
     /// let runs: usize = 20; // number of simulations to run for estimation
     /// let df_rt: f64 = 0.72; // rate for steady state debris-flow accumulation
+    /// let until = 4095; // range limit for tracking transit times
     ///
     /// // to estimate transit times, omit inherit age from charcoal
     /// let debris_flows = Reservoir::new().input(&df_rt)?.output(&df_rt)?;
-    /// let mut df_mod = Model::new(debris_flows).period(&period).runs(runs);
+    /// let mut df_mod = Model::new(debris_flows).period(&period).runs(runs).range(until);
     ///
     /// // vector of transit times
-    /// let until = 4095;
-    /// let df_t = df_mod.transit_times(until);
+    /// let df_t = df_mod.transit_times();
     ///
     /// println!("Debris-flow transit time quantiles are {:?}", utils::quantiles(&df_t));
     ///
     /// Ok(())
     /// }
     /// ```
-    pub fn transit_times(&mut self, rng: i32) -> Vec<f64> {
+    pub fn transit_times(&mut self) -> Vec<f64> {
         let mut res = Vec::with_capacity(self.runs);
         let seeder: rand::distributions::Uniform<u64> =
             rand::distributions::Uniform::new(0, 10000000);
@@ -796,7 +804,7 @@ impl Model {
             .map(|x| x.sim(&self.period).unwrap())
             .collect();
 
-        let index = 0..rng;
+        let index = 0..self.range;
         let mut out = vec![Complex::new(0.0, 0.0); index.len()];
         let mut real_planner = RealFftPlanner::<f64>::new();
         info!("Constructing FftPlanner for fourier transforms.");
@@ -834,6 +842,7 @@ impl Default for Model {
             runs: 100,
             batch: 10,
             duration: 1,
+            range: 10000,
         }
     }
 }
