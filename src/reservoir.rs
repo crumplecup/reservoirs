@@ -6,7 +6,12 @@ use log::*;
 use rand::SeedableRng;
 use rand_distr::{Distribution, Exp};
 use rayon::prelude::*;
+use rustfft::{FftPlanner, num_complex::Complex};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use rustfft::num_complex::Complex64;
+use rustfft::num_traits::abs;
+
 
 /// Holder struct for passing test values between functions.
 /// Makes functions calls and returns less confusing.
@@ -781,13 +786,41 @@ impl Model {
             .map(|x| x.sim(&self.period).unwrap())
             .collect();
 
-        let mut rec = vec![0.0];
-        for r in res {
-            let cdf = utils::cdf_bin(&r.mass, 1000);
-            rec = utils::cdf_dual(&rec, &cdf)
-                .iter().map(|x| x.0).collect::<Vec<f64>>();
+        let mut planner = FftPlanner::new();
+        let fft = planner.plan_fft_forward(1000);
+        let inv_fft = planner.plan_fft_inverse(1000);
+        let res_ln = Complex64::new(res.len() as f64, 0.0);
+/*        for r in res {
+            let mut buffer = r.mass.iter()
+                .map(|x| Complex64::new(*x, 0.0)).collect::<Vec<Complex64>>();
+//            fft.process(&mut [buffer]);
+            buffer = buffer.iter().map(|x| x / res_ln).collect();
         }
-        rec
+*/
+        let mut bf = res[1].mass.clone()
+            .iter().map(|x| Complex64::new(*x, 0.0)).collect::<Vec<Complex64>>();
+        let mut buff1 = res[2].mass.clone()
+            .iter().map(|x| Complex64::new(*x, 0.0)).collect::<Vec<Complex64>>();
+
+        fft.process(&mut bf);
+        fft.process(&mut buff1);
+        bf = bf.iter().map(|x| x / res_ln).collect();
+        buff1 = buff1.iter().map(|x| x / res_ln).collect();
+        let mut buff = Vec::new();
+        for i in 0..bf.len()-1 {
+            buff.push(bf[i] + buff1[i])
+        }
+        inv_fft.process(&mut buff);
+        bf = buff.iter().map(|x| x / res_ln).collect();
+        let buff = bf.iter().map(|x| x.re).collect::<Vec<f64>>();
+
+        // let mut rec = vec![0.0];
+        // for r in res {
+        //     let cdf = utils::cdf_bin(&r.mass, 1000);
+        //     rec = utils::cdf_dual(&rec, &cdf)
+        //         .iter().map(|x| x.0).collect::<Vec<f64>>();
+        // }
+        buff
     }
 }
 
