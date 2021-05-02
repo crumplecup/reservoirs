@@ -30,7 +30,7 @@
 * ```rust
 * use reservoirs::prelude::*;
 *
-* fn main() -> Result<(), ResError>{
+* fn main() -> Result<(), ResError> {
 * use reservoirs::prelude::*;
 *
 * // mean expected deposit age and inherited age by facies
@@ -82,20 +82,21 @@
 * ```rust
 * use reservoirs::prelude::*;
 *
-* // build step by step
-* let mut res = Reservoir::new();
-* res = res.input(&0.78)?;
-* res = res.output(&0.78)?;
-* res = res.inherit(&vec![10.0, 20.0, 27.0, 100.3, 7000.0, 10000.0]);
+* fn main() -> Result<(), ResError> {
+*     // build step by step
+*     let mut res = Reservoir::new();
+*     res = res.input(&0.78)?;
+*     res = res.output(&0.78)?;
+*     res = res.inherit(&vec![10.0, 20.0, 27.0, 100.3, 7000.0, 10000.0]);
 *
-* // or inline, same result
-* let res_b = Reservoir::new()
-*     .input(&0.78)?
-*     .output(&0.78)?
-*     .inherit(&vec![10.0, 20.0, 27.0, 100.3, 7000.0, 10000.0]);
+*     // or inline, same result
+*     let res_b = Reservoir::new()
+*         .input(&0.78)?
+*         .output(&0.78)?
+*         .inherit(&vec![10.0, 20.0, 27.0, 100.3, 7000.0, 10000.0]);
 *
-* assert_eq!(res, res_b);
-*
+*    Ok(())
+*}
 * ```
 */
 #![warn(missing_docs)]

@@ -5,6 +5,8 @@ pub enum ResError {
     CsvError,
     /// Error type from rand crate.
     ExpError,
+    /// Error type from realfft crate.
+    FftError,
     /// Error type from std::io.
     IoError,
     /// Error type from Box<dyn StdError>
@@ -21,6 +23,7 @@ impl std::fmt::Display for ResError {
                 f,
                 "Could not create exponential distribution from rate provided."
             ),
+            ResError::FftError => write!(f, "Error with fft process."),
             ResError::IoError => write!(f, "Could not read file from path provided."),
             ResError::BoxError => write!(f, "Maybe a plot error."),
         }
@@ -36,6 +39,12 @@ impl From<csv::Error> for ResError {
 impl From<rand_distr::ExpError> for ResError {
     fn from(_: rand_distr::ExpError) -> Self {
         ResError::ExpError
+    }
+}
+
+impl From<realfft::FftError> for ResError {
+    fn from(_: realfft::FftError) -> Self {
+        ResError::FftError
     }
 }
 

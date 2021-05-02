@@ -6,11 +6,9 @@ use log::*;
 use rand::SeedableRng;
 use rand_distr::{Distribution, Exp};
 use rayon::prelude::*;
-use rustfft::{FftPlanner, num_complex::Complex};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use rustfft::num_complex::Complex64;
-use rustfft::num_traits::abs;
+use realfft::RealFftPlanner;
+use rustfft::num_complex::Complex;
 
 
 /// Holder struct for passing test values between functions.
@@ -203,6 +201,7 @@ impl Model {
     /// ```rust
     /// use reservoirs::prelude::*;
     ///
+    /// fn main() -> Result<(), ResError> {
     /// // mean expected deposit age and inherited age by facies
     /// let dep = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/dep.csv")?;
     /// let iat = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/iat.csv")?;
@@ -239,6 +238,8 @@ impl Model {
     /// // to observed debris flows
     /// // by running 1000 simulations for 30000 years for each pair
     /// model.fit_range(0.01..1.0, 0.01..1.0, &df, "examples/df_fit_1k.csv");
+    /// Ok(())
+    /// }
     /// ```
     pub fn fit_range(
         &mut self,
@@ -275,6 +276,7 @@ impl Model {
     ///
     /// ```rust
     /// use reservoirs::prelude::*;
+    /// fn main() -> Result<(), ResError> {
     ///
     /// // mean expected deposit age and inherited age by facies
     /// let dep = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/dep.csv")?;
@@ -310,6 +312,8 @@ impl Model {
     /// // to observed debris flows
     /// // by running 1000 simulations for 30000 years for each pair
     /// let gofs = model.fit_rng(0.01..1.0, 0.01..1.0, &df);
+    /// Ok(())
+    /// }
     /// ```
     pub fn fit_rng(
         &mut self,
@@ -369,6 +373,7 @@ impl Model {
     ///
     /// ```rust
     /// use reservoirs::prelude::*;
+    /// fn main() -> Result<(), ResError> {
     ///
     /// // mean expected deposit age and inherited age by facies
     /// let dep = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/dep.csv")?;
@@ -401,10 +406,10 @@ impl Model {
     /// // fit selected rate pairs
     /// // to observed debris flows
     /// // by running 1000 simulations for 30000 years for each pair
-    /// let (ks, kp, _) = model.fit_rate(&df);
+    /// let fits = model.fit_rate(&df);
     ///
-    /// println!("K-S fit is {}.", ks);
-    /// println!("Kuiper fit is {}.", kp);
+    /// Ok(())
+    /// }
     /// ```
     pub fn fit_rate(&mut self, other: &[f64]) -> Fits {
         let mut res: Vec<Reservoir> = Vec::with_capacity(self.runs);
@@ -464,6 +469,7 @@ impl Model {
     ///
     /// ```rust
     /// use reservoirs::prelude::*;
+    /// fn main() -> Result<(), ResError> {
     ///
     /// // mean expected deposit age and inherited age by facies
     /// let dep = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/dep.csv")?;
@@ -501,6 +507,9 @@ impl Model {
     /// // to observed debris flows
     /// // by running 1000 simulations for 30000 years for each pair
     /// model.fit_steady(0.01..1.0, &df, "examples/df_fit_1k.csv");
+    ///
+    /// Ok(())
+    /// }
     /// ```
     pub fn fit_steady(&mut self, rate: std::ops::Range<f64>, obs: &[f64], title: &str) {
         let dur = std::time::Duration::new(60 * 60 * self.duration, 0);
@@ -562,6 +571,7 @@ impl Model {
     ///
     /// ```rust
     /// use reservoirs::prelude::*;
+    /// fn main() -> Result<(), ResError> {
     ///
     /// // mean expected deposit age and inherited age by facies
     /// let dep = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/dep.csv")?;
@@ -597,6 +607,9 @@ impl Model {
     /// // to observed debris flows
     /// // by running 1000 simulations for 30000 years for each pair
     /// let gofs = model.steady(0.01..1.0, &df);
+    ///
+    /// Ok(())
+    /// }
     /// ```
     pub fn steady(&mut self, rate: std::ops::Range<f64>, obs: &[f64]) -> Vec<Gof> {
         let mut rates = Vec::with_capacity(self.batch);
@@ -650,6 +663,7 @@ impl Model {
     ///
     /// ```rust
     /// use reservoirs::prelude::*;
+    /// fn main() -> Result<(), ResError> {
     ///
     /// // mean expected deposit age and inherited age by facies
     /// let dep = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/dep.csv")?;
@@ -683,6 +697,9 @@ impl Model {
     /// let eg = model.stereotype(500);
     /// // compare the CDF of the synthetic example to the observed debris-flow deposit record
     /// plot::comp_cdf(&eg, &df, "examples/df_cdf.png");
+    ///
+    /// Ok(())
+    /// }
     ///```
     pub fn stereotype(&mut self, bins: usize) -> Vec<f64> {
         let mut res: Vec<Model> = Vec::with_capacity(self.runs);
@@ -743,9 +760,10 @@ impl Model {
     ///
     /// ```rust
     /// use reservoirs::prelude::*;
+    /// fn main() -> Result<(), ResError> {
     ///
-    /// let period: f64 = 30000.0;  // length of time to simulate accumulation in the reservoir in years
-    /// let runs: usize = 1000; // number of simulations to run for estimation
+    /// let period: f64 = 2000.0;  // length of time to simulate accumulation in the reservoir in years
+    /// let runs: usize = 20; // number of simulations to run for estimation
     /// let df_rt: f64 = 0.72; // rate for steady state debris-flow accumulation
     /// let ff_rt: f64 = 0.63; // rate for steady state fluvial fines accumulation
     /// let fg_rt: f64 = 0.58; // rate for steady state fluvial gravels accumulation
@@ -768,6 +786,8 @@ impl Model {
     /// println!("Fluvial fines transit time quantiles are {:?}", utils::quantiles(&ff_t));
     /// println!("Fluvial gravels transit time quantiles are {:?}", utils::quantiles(&fg_t));
     ///
+    /// Ok(())
+    /// }
     /// ```
     pub fn transit_times(&mut self) -> Vec<f64> {
         let mut res = Vec::with_capacity(self.runs);
@@ -786,42 +806,41 @@ impl Model {
             .map(|x| x.sim(&self.period).unwrap())
             .collect();
 
-        let mut planner = FftPlanner::new();
-        let res_ln = Complex64::new(res.len() as f64, 0.0);
-/*        for r in res {
-            let mut buffer = r.mass.iter()
-                .map(|x| Complex64::new(*x, 0.0)).collect::<Vec<Complex64>>();
-//            fft.process(&mut [buffer]);
-            buffer = buffer.iter().map(|x| x / res_ln).collect();
+        let bins = 1000i32;
+        let index = 0..bins;
+        let mut out = vec![Complex::new(0.0, 0.0); index.len()];
+        let mut real_planner = RealFftPlanner::<f64>::new();
+        info!("Constructing FftPlanner for fourier transforms.");
+        let r2c = real_planner.plan_fft_forward(index.len()+1);
+        for r in res {
+            let cdf = utils::cdf_rng(&r.mass, &index);
+            let mut pmf = utils::pmf_from_cdf(&cdf);
+            let mut spectrum = r2c.make_output_vec();
+            info!("Forward transforming the pmf using fft.");
+            r2c.process(&mut pmf, &mut spectrum).unwrap();
+            info!("Summing transformed pmfs.");
+            out = out.iter().zip(spectrum.iter())
+                .map(|(a, b)| a + b).collect::<Vec<Complex<f64>>>();
         }
-*/
-        let mut bf = res[1].mass.clone()
-            .iter().map(|x| Complex64::new(*x, 0.0)).collect::<Vec<Complex64>>();
-        let mut buff1 = res[2].mass.clone()
-            .iter().map(|x| Complex64::new(*x, 0.0)).collect::<Vec<Complex64>>();
+        info!("Constructing FftPlanner for inverse fourier transforms.");
+        let c2r = real_planner.plan_fft_inverse(index.len()+1);
+        info!("Inverse fourier transform using fft.");
+        let mut out_data = c2r.make_output_vec();
+        c2r.process(&mut out, &mut out_data).unwrap();
+        info!("Normalize output by dividing by length.");
+        out_data = out_data.iter().map(|a| a / index.len() as f64).collect::<Vec<f64>>();
+        out_data
 
-        let fft = planner.plan_fft_forward(bf.len()-1);
-        fft.process(&mut bf);
-        let fft = planner.plan_fft_forward(buff1.len()-1);
-        fft.process(&mut buff1);
-        bf = bf.iter().map(|x| x / res_ln).collect();
-        buff1 = buff1.iter().map(|x| x / res_ln).collect();
-        let mut buff = Vec::new();
-        for i in 0..bf.len()-1 {
-            buff.push(bf[i] + buff1[i])
+
+/*        let mut rec = vec![0.0];
+        for r in res {
+            let cdf = utils::cdf_bin(&r.mass, 1000);
+            rec = utils::cdf_dual(&rec, &cdf)
+                .iter()
+                .map(|x| x.0)
+                .collect::<Vec<f64>>();
         }
-        let inv_fft = planner.plan_fft_inverse(buff.len()-1);
-        inv_fft.process(&mut buff);
-        bf = buff.iter().map(|x| x / res_ln).collect();
-        let buff = bf.iter().map(|x| x.re).collect::<Vec<f64>>();
-
-        // let mut rec = vec![0.0];
-        // for r in res {
-        //     let cdf = utils::cdf_bin(&r.mass, 1000);
-        //     rec = utils::cdf_dual(&rec, &cdf)
-        //         .iter().map(|x| x.0).collect::<Vec<f64>>();
-        // }
-        buff
+        rec*/
     }
 }
 
@@ -859,6 +878,7 @@ impl Reservoir {
     ///
     /// ```rust
     /// use reservoirs::prelude::*;
+    /// fn main() -> Result<(), ResError> {
     ///
     /// // mean expected deposit age and inherited age by facies
     /// let dep = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/dep.csv")?;
@@ -875,6 +895,8 @@ impl Reservoir {
     /// println!("K-S fit is {}.", ks);
     /// println!("Kuiper fit is {}.", kp);
     ///
+    /// Ok(())
+    /// }
     /// ```
     pub fn gof(&self, other: &[f64]) -> Fit {
         let cdf = utils::cdf_dual(&self.mass, other);
@@ -921,6 +943,7 @@ impl Reservoir {
     ///
     /// ```
     /// use reservoirs::prelude::*;
+    /// fn main() -> Result<(), ResError> {
     /// // mean expected inherited age by facies
     /// let iat = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/iat.csv")?;
     ///
@@ -928,6 +951,9 @@ impl Reservoir {
     /// let ia: Vec<f64> = iat.iter().map(|x| x.age).collect();
     ///
     /// let res = Reservoir::new().inherit(&ia);
+    ///
+    /// Ok(())
+    /// }
     /// ```
     pub fn inherit(mut self, ages: &[f64]) -> Self {
         self.inherit = Some(ages.to_vec());
@@ -941,7 +967,10 @@ impl Reservoir {
     ///
     /// ```
     /// use reservoirs::prelude::*;
+    /// fn main() -> Result<(), ResError> {
     /// res = Reservoir::new().input(&0.58)?;
+    /// Ok(())
+    /// }
     /// ```
     pub fn input(mut self, rate: &f64) -> Result<Self, errors::ResError> {
         let rate = Exp::new(*rate)?;
@@ -956,7 +985,10 @@ impl Reservoir {
     /// # Examples
     /// ```
     /// use reservoirs::prelude::*;
-    /// let mut res = Reservoir::new();
+    /// fn main() -> Result<(), ResError> {
+    ///     let mut res = Reservoir::new();
+    ///     Ok(())
+    /// }
     /// ```
     pub fn new() -> Self {
         Reservoir {
