@@ -829,6 +829,9 @@ impl Model {
         c2r.process(&mut out, &mut out_data).unwrap();
         info!("Normalize output by dividing by length.");
         out_data = out_data.iter().map(|a| a / index.len() as f64).collect::<Vec<f64>>();
+        let sum_out = out_data.iter().fold(0.0, |acc, x| acc + *x);
+        out_data = out_data.iter().map(|a| a / sum_out).collect::<Vec<f64>>();
+
         out_data
 
 
