@@ -781,22 +781,12 @@ impl Model {
             .map(|x| x.sim(&self.period).unwrap())
             .collect();
 
-        let mut rec = Vec::new();
-        let res_ln = res.len() as f64;
+        let mut rec = vec![0.0];
         for r in res {
-            let mut mass = utils::cdf_bin(&r.mass, 1000);
-            if rec.len() < 1000 {
-                rec.append(&mut mass);
-            }
-            if rec.len() == 1000 {
-                rec = rec
-                    .iter()
-                    .zip(mass)
-                    .map(|(a, b)| *a + b)
-                    .collect::<Vec<f64>>();
-            }
+            let cdf = utils::cdf_bin(&r.mass, 1000);
+            rec = utils::cdf_dual(&rec, &cdf)
+                .iter().map(|x| x.0).collect::<Vec<f64>>();
         }
-        rec = rec.iter().map(|a| *a / res_ln).collect::<Vec<f64>>();
         rec
     }
 }
