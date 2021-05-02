@@ -800,9 +800,9 @@ impl Model {
         let mut buff1 = res[2].mass.clone()
             .iter().map(|x| Complex64::new(*x, 0.0)).collect::<Vec<Complex64>>();
 
-        let fft = planner.plan_fft_forward(bf.len());
+        let fft = planner.plan_fft_forward(bf.len()-1);
         fft.process(&mut bf);
-        let fft = planner.plan_fft_forward(buff1.len());
+        let fft = planner.plan_fft_forward(buff1.len()-1);
         fft.process(&mut buff1);
         bf = bf.iter().map(|x| x / res_ln).collect();
         buff1 = buff1.iter().map(|x| x / res_ln).collect();
@@ -810,7 +810,7 @@ impl Model {
         for i in 0..bf.len()-1 {
             buff.push(bf[i] + buff1[i])
         }
-        let inv_fft = planner.plan_fft_inverse(buff.len());
+        let inv_fft = planner.plan_fft_inverse(buff.len()-1);
         inv_fft.process(&mut buff);
         bf = buff.iter().map(|x| x / res_ln).collect();
         let buff = bf.iter().map(|x| x.re).collect::<Vec<f64>>();
