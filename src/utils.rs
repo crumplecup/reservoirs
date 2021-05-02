@@ -20,7 +20,8 @@ pub fn ad_dual(sample: &[f64], other: &[f64]) -> f64 {
     let mut adi = Vec::new();
 
     for (i, val) in ad_i.iter().take(k - 1).enumerate() {
-        let step = f64::powi((k as f64 * val) - (lnx * (i+1)) as f64, 2) / ((i+1) * (k - (i+1))) as f64;
+        let step = f64::powi((k as f64 * val) - (lnx * (i + 1)) as f64, 2)
+            / ((i + 1) * (k - (i + 1))) as f64;
         adi.push(step);
     }
     let mut ad = adi.iter().sum::<f64>();
@@ -59,7 +60,7 @@ pub fn cdf(x: &[f64]) -> Vec<(f64, f64)> {
 /// binned into `bins` number of obs to preserve memory on large vectors.
 ///  - `x` is a reference to a slice of f64 values.
 ///  - `bins` is the number of observations to subsample from `x`.
-///  - Returns a vector of tuples(val, cdf).
+///  - Returns a vector of the cdf.
 pub fn cdf_bin(obs: &[f64], bins: usize) -> Vec<f64> {
     let cdf: Vec<(f64, f64)> = cdf(obs);
     let mut cdf_bin = Vec::new();

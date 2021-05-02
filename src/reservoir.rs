@@ -2,6 +2,7 @@
 use crate::errors;
 use crate::plot;
 use crate::utils;
+use log::*;
 use rand::SeedableRng;
 use rand_distr::{Distribution, Exp};
 use rayon::prelude::*;
@@ -779,11 +780,23 @@ impl Model {
             .cloned()
             .map(|x| x.sim(&self.period).unwrap())
             .collect();
+
         let mut rec = Vec::new();
+        let res_ln = res.len() as f64;
         for r in res {
-            let mut mass = r.mass.clone();
-            rec.append(&mut mass);
+            let mut mass = utils::cdf_bin(&r.mass, 1000);
+            if rec.len() < 1000 {
+                rec.append(&mut mass);
+            }
+            if rec.len() == 1000 {
+                rec = rec
+                    .iter()
+                    .zip(mass)
+                    .map(|(a, b)| *a + b)
+                    .collect::<Vec<f64>>();
+            }
         }
+        rec = rec.iter().map(|a| *a / res_ln).collect::<Vec<f64>>();
         rec
     }
 }
@@ -982,13 +995,14 @@ impl Reservoir {
     ///
     /// ```
     pub fn sim(mut self, period: &f64) -> Result<Self, errors::ResError> {
+        let _ = pretty_env_logger::try_init();
         let mut om = 0f64;
         let mut im = 0f64;
         let mut mass = Vec::new(); // time of arrivals in reservoir
                                    // let mut flux = Vec::new();  //
 
         while om < *period {
-            // Generate a time for removal
+            info!("Generating a time for removal.");
             match self.output {
                 Some(x) => om += x.sample(&mut self.range) as f64,
                 // TODO: Implement zero rates for input and output
@@ -996,7 +1010,7 @@ impl Reservoir {
             }
 
             while im < om {
-                // Generate inputs until time for removal
+                info!("Generating inputs until time for removal.");
                 if let Some(x) = self.input {
                     im += x.sample(&mut self.range) as f64;
                     mass.push(im);
@@ -1004,9 +1018,9 @@ impl Reservoir {
             }
 
             if !mass.is_empty() {
-                // If there are inputs to remove
+                info!("Inputs are available for removal.");
                 let mvec: Vec<f64> = mass.par_iter().cloned().filter(|x| x <= &om).collect();
-                // Only remove inputs younger than the output time
+                info!("Selecting from inputs present before time of removal.");
                 if !mvec.is_empty() {
                     let rm =
                         rand::distributions::Uniform::from(0..mvec.len()).sample(&mut self.range);

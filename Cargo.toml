@@ -13,10 +13,18 @@ categories = ["science", "simulation"]
 
 [dependencies]
 csv = "1.1.5"
+log = "0.4.14"
 plotters = "0.3.0"
 plotters-bitmap = "0.3.0"
+pretty_env_logger = "0.4.0"
 rand = "0.8.3"
 rand_distr = "0.4.0"
 rayon = "1.5.0"
 serde = { version = "1.0.123", features = ["derive"] }
 
+[dev-dependencies]
+criterion = "0.3.4"
+
+[[bench]]
+name = "benchmarks"
+harness = false
