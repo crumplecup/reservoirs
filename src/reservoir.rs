@@ -765,31 +765,21 @@ impl Model {
     /// let period: f64 = 2000.0;  // length of time to simulate accumulation in the reservoir in years
     /// let runs: usize = 20; // number of simulations to run for estimation
     /// let df_rt: f64 = 0.72; // rate for steady state debris-flow accumulation
-    /// let ff_rt: f64 = 0.63; // rate for steady state fluvial fines accumulation
-    /// let fg_rt: f64 = 0.58; // rate for steady state fluvial gravels accumulation
     ///
     /// // to estimate transit times, omit inherit age from charcoal
     /// let debris_flows = Reservoir::new().input(&df_rt)?.output(&df_rt)?;
-    /// let fines = Reservoir::new().input(&ff_rt)?.output(&ff_rt)?;
-    /// let gravels = Reservoir::new().input(&fg_rt)?.output(&fg_rt)?;
-    ///
     /// let mut df_mod = Model::new(debris_flows).period(&period).runs(runs);
-    /// let mut ff_mod = Model::new(fines).period(&period).runs(runs);
-    /// let mut fg_mod = Model::new(gravels).period(&period).runs(runs);
     ///
     /// // vector of transit times
-    /// let df_t = df_mod.transit_times();
-    /// let ff_t = ff_mod.transit_times();
-    /// let fg_t = fg_mod.transit_times();
+    /// let until = 4095;
+    /// let df_t = df_mod.transit_times(until);
     ///
     /// println!("Debris-flow transit time quantiles are {:?}", utils::quantiles(&df_t));
-    /// println!("Fluvial fines transit time quantiles are {:?}", utils::quantiles(&ff_t));
-    /// println!("Fluvial gravels transit time quantiles are {:?}", utils::quantiles(&fg_t));
     ///
     /// Ok(())
     /// }
     /// ```
-    pub fn transit_times(&mut self) -> Vec<f64> {
+    pub fn transit_times(&mut self, rng: i32) -> Vec<f64> {
         let mut res = Vec::with_capacity(self.runs);
         let seeder: rand::distributions::Uniform<u64> =
             rand::distributions::Uniform::new(0, 10000000);
@@ -806,8 +796,7 @@ impl Model {
             .map(|x| x.sim(&self.period).unwrap())
             .collect();
 
-        let bins = 1000i32;
-        let index = 0..bins;
+        let index = 0..rng;
         let mut out = vec![Complex::new(0.0, 0.0); index.len()];
         let mut real_planner = RealFftPlanner::<f64>::new();
         info!("Constructing FftPlanner for fourier transforms.");
@@ -829,21 +818,11 @@ impl Model {
         c2r.process(&mut out, &mut out_data).unwrap();
         info!("Normalize output by dividing by length.");
         out_data = out_data.iter().map(|a| a / index.len() as f64).collect::<Vec<f64>>();
+        info!("Normalize output by dividing by sum of pmfs (having added several pmfs together).");
         let sum_out = out_data.iter().fold(0.0, |acc, x| acc + *x);
         out_data = out_data.iter().map(|a| a / sum_out).collect::<Vec<f64>>();
 
         out_data
-
-
-/*        let mut rec = vec![0.0];
-        for r in res {
-            let cdf = utils::cdf_bin(&r.mass, 1000);
-            rec = utils::cdf_dual(&rec, &cdf)
-                .iter()
-                .map(|x| x.0)
-                .collect::<Vec<f64>>();
-        }
-        rec*/
     }
 }
 
