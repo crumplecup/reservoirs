@@ -198,7 +198,7 @@ impl Model {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```no_run
     /// use reservoirs::prelude::*;
     ///
     /// fn main() -> Result<(), ResError> {
@@ -277,42 +277,27 @@ impl Model {
     /// ```rust
     /// use reservoirs::prelude::*;
     /// fn main() -> Result<(), ResError> {
+    ///     let ages = vec![10.0, 42.0, 77.7, 12.0, 99.9, 10000.0, 777.7];
     ///
-    /// // mean expected deposit age and inherited age by facies
-    /// let dep = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/dep.csv")?;
-    /// let iat = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/iat.csv")?;
+    ///     let mut debris_flows = Reservoir::new()
+    ///         .input(&0.862)?
+    ///         .output(&0.862)?;
     ///
-    /// // subset mean ages of debris flows
-    /// let df: Vec<f64> = dep.iter()
-    ///     .filter(|x| x.facies == "DF")
-    ///     .map(|x| x.age)
-    ///     .collect();
+    ///     // model parameters
+    ///     let batch = 10;  // fit 10 input/output pairs at a time using rayon
+    ///     let period = 3000.0; // run simulations for 3000 years
+    ///     let runs = 20; // run 20 simulated accumulations per candidate pair for goodness-of-fit
     ///
-    /// // subset inherited ages
-    /// let ia: Vec<f64> = iat.iter()
-    ///     .map(|x| x.age)
-    ///     .collect();
-    ///
-    /// let mut debris_flows = Reservoir::new()
-    ///     .input(&0.687)?
-    ///     .output(&0.687)?
-    ///     .inherit(&ia);
-    ///
-    /// // model parameters
-    /// let batch = 10;  // fit 10 input/output pairs at a time using rayon
-    /// let period = 30000.0; // run simulations for 30000 years
-    /// let runs = 1000; // run 1000 simulated accumulations per candidate pair for goodness-of-fit
-    ///
-    /// // create reservoir model using builder pattern
-    /// let mut model = Model::new(debris_flows)
-    ///     .batch(batch)
-    ///     .period(&period)
-    ///     .runs(runs);
-    /// // fit batches of 10 randomly selected rate pairs (from range 0.01 to 1.0)
-    /// // to observed debris flows
-    /// // by running 1000 simulations for 30000 years for each pair
-    /// let gofs = model.fit_rng(0.01..1.0, 0.01..1.0, &df);
-    /// Ok(())
+    ///     // create reservoir model using builder pattern
+    ///     let mut model = Model::new(debris_flows)
+    ///         .batch(batch)
+    ///         .period(&period)
+    ///         .runs(runs);
+    ///     // fit batches of 10 randomly selected rate pairs (from range 0.01 to 1.0)
+    ///     // to observed debris flows
+    ///     // by running 20 simulations for 3000 years for each pair
+    ///     let gofs = model.fit_rng(0.01..1.0, 0.01..1.0, &ages);
+    ///     Ok(())
     /// }
     /// ```
     pub fn fit_rng(
@@ -374,41 +359,26 @@ impl Model {
     /// ```rust
     /// use reservoirs::prelude::*;
     /// fn main() -> Result<(), ResError> {
+    ///     let ages = vec![10.0, 42.0, 77.7, 12.0, 99.9, 10000.0, 777.7];
     ///
-    /// // mean expected deposit age and inherited age by facies
-    /// let dep = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/dep.csv")?;
-    /// let iat = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/iat.csv")?;
+    ///     let mut debris_flows = Reservoir::new()
+    ///         .input(&0.862)?
+    ///         .output(&0.862)?;
     ///
-    /// // subset mean ages of debris flows
-    /// let df: Vec<f64> = dep.iter()
-    ///     .filter(|x| x.facies == "DF")
-    ///     .map(|x| x.age)
-    ///     .collect();
+    ///     // model parameters
+    ///     let period = 3000.0; // run simulations for 3000 years
+    ///     let runs = 20; // run 20 simulated accumulations per candidate pair for goodness-of-fit
     ///
-    /// // subset inherited ages
-    /// let ia: Vec<f64> = iat.iter()
-    ///     .map(|x| x.age)
-    ///     .collect();
+    ///     // create reservoir model using builder pattern
+    ///     let mut model = Model::new(debris_flows)
+    ///         .period(&period)
+    ///         .runs(runs);
+    ///     // fit selected rate pairs
+    ///     // to observed debris flows
+    ///     // by running 20 simulations for 3000 years for each pair
+    ///     let fits = model.fit_rate(&ages);
     ///
-    /// let mut debris_flows = Reservoir::new()
-    ///     .input(&0.687)?
-    ///     .output(&0.687)?
-    ///     .inherit(&ia);
-    ///
-    /// // model parameters
-    /// let period = 30000.0; // run simulations for 30000 years
-    /// let runs = 1000; // run 1000 simulated accumulations per candidate pair for goodness-of-fit
-    ///
-    /// // create reservoir model using builder pattern
-    /// let mut model = Model::new(debris_flows)
-    ///     .period(&period)
-    ///     .runs(runs);
-    /// // fit selected rate pairs
-    /// // to observed debris flows
-    /// // by running 1000 simulations for 30000 years for each pair
-    /// let fits = model.fit_rate(&df);
-    ///
-    /// Ok(())
+    ///     Ok(())
     /// }
     /// ```
     pub fn fit_rate(&mut self, other: &[f64]) -> Fits {
@@ -467,7 +437,7 @@ impl Model {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```no_run
     /// use reservoirs::prelude::*;
     /// fn main() -> Result<(), ResError> {
     ///
@@ -695,43 +665,27 @@ impl Model {
     /// ```rust
     /// use reservoirs::prelude::*;
     /// fn main() -> Result<(), ResError> {
+    ///     let ages = vec![10.0, 42.0, 77.7, 12.0, 99.9, 10000.0, 777.7];
+    ///     let mut debris_flows = Reservoir::new()
+    ///         .input(&0.862)?
+    ///         .output(&0.862)?;
     ///
-    /// // mean expected deposit age and inherited age by facies
-    /// let dep = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/dep.csv")?;
-    /// let iat = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/iat.csv")?;
+    ///     // model parameters
+    ///     let batch = 10;  // fit 10 input/output pairs at a time using rayon
+    ///     let period = 3000.0; // run simulations for 30000 years
+    ///     let runs = 20; // run 1000 simulated accumulations per candidate pair for goodness-of-fit
     ///
-    /// // subset mean ages of debris flows
-    /// let df: Vec<f64> = dep.iter()
-    ///     .filter(|x| x.facies == "DF")
-    ///     .map(|x| x.age)
-    ///     .collect();
+    ///     // create reservoir model using builder pattern
+    ///     let mut model = Model::new(debris_flows)
+    ///         .batch(batch)
+    ///         .period(&period)
+    ///         .runs(runs);
+    ///     // fit a batch of 10 randomly selected rate pairs (from range 0.01 to 1.0)
+    ///     // to observed debris flows
+    ///     // by running 20 simulations for 3000 years for each pair
+    ///     let gofs = model.steady(0.01..1.0, &ages);
     ///
-    /// // subset inherited ages
-    /// let ia: Vec<f64> = iat.iter()
-    ///     .map(|x| x.age)
-    ///     .collect();
-    ///
-    /// let mut debris_flows = Reservoir::new()
-    ///     .input(&0.687)?
-    ///     .output(&0.687)?
-    ///     .inherit(&ia);
-    ///
-    /// // model parameters
-    /// let batch = 10;  // fit 10 input/output pairs at a time using rayon
-    /// let period = 30000.0; // run simulations for 30000 years
-    /// let runs = 1000; // run 1000 simulated accumulations per candidate pair for goodness-of-fit
-    ///
-    /// // create reservoir model using builder pattern
-    /// let mut model = Model::new(debris_flows)
-    ///     .batch(batch)
-    ///     .period(&period)
-    ///     .runs(runs);
-    /// // fit a batch of 10 randomly selected rate pairs (from range 0.01 to 1.0)
-    /// // to observed debris flows
-    /// // by running 1000 simulations for 30000 years for each pair
-    /// let gofs = model.steady(0.01..1.0, &df);
-    ///
-    /// Ok(())
+    ///     Ok(())
     /// }
     /// ```
     pub fn steady(&mut self, rate: std::ops::Range<f64>, obs: &[f64]) -> Vec<Gof> {
@@ -790,40 +744,27 @@ impl Model {
     /// use reservoirs::prelude::*;
     /// fn main() -> Result<(), ResError> {
     ///
-    /// // mean expected deposit age and inherited age by facies
-    /// let dep = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/dep.csv")?;
-    /// let iat = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/iat.csv")?;
+    ///     let mut debris_flows = Reservoir::new()
+    ///         .input(&0.862)?
+    ///         .output(&0.862)?;
     ///
-    /// // subset mean ages of debris flows
-    /// let df: Vec<f64> = dep.iter()
-    ///         .filter(|x| x.facies == "DF")
-    ///         .map(|x| x.age)
-    ///        .collect();
-    /// // subset inherited ages
-    /// let ia: Vec<f64> = iat.iter()
-    ///     .map(|x| x.age)
-    ///     .collect();
+    ///     // model parameters
+    ///     let period = 3000.0; // run simulations for 30000 years
+    ///     let runs = 20; // run 1000 simulated accumulations per candidate pair for goodness-of-fit
+    ///     let bins = 500; // split observation into bins for deriving CDF
     ///
-    /// let mut debris_flows = Reservoir::new()
-    ///     .input(&0.687)?
-    ///     .output(&0.687)?
-    ///     .inherit(&ia);
+    ///     // create reservoir model using builder pattern
+    ///     let mut model = Model::new(debris_flows)
+    ///         .period(&period)
+    ///         .runs(runs);
     ///
-    /// // model parameters
-    /// let period = 30000.0; // run simulations for 30000 years
-    /// let runs = 1000; // run 1000 simulated accumulations per candidate pair for goodness-of-fit
+    ///     // sample a stereotypical record from 1000 runs of 30000 years
+    ///     let eg = model.stereotype(bins);
+    ///     let egx = model.stereotype(bins);
+    ///     // compare the CDF of the synthetic example to the observed debris-flow deposit record
+    ///     plot::comp_cdf(&eg, &egx, "examples/transit_stereotype.png");
     ///
-    /// // create reservoir model using builder pattern
-    /// let mut model = Model::new(debris_flows)
-    ///     .period(&period)
-    ///     .runs(runs);
-    ///
-    /// // sample a stereotypical record from 1000 runs of 30000 years
-    /// let eg = model.stereotype(500);
-    /// // compare the CDF of the synthetic example to the observed debris-flow deposit record
-    /// plot::comp_cdf(&eg, &df, "examples/df_cdf.png");
-    ///
-    /// Ok(())
+    ///     Ok(())
     /// }
     ///```
     pub fn stereotype(&mut self, bins: usize) -> Vec<f64> {
@@ -995,22 +936,14 @@ impl Reservoir {
     /// ```rust
     /// use reservoirs::prelude::*;
     /// fn main() -> Result<(), ResError> {
-    ///
-    /// // mean expected deposit age and inherited age by facies
-    /// let dep = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/dep.csv")?;
-    /// let iat = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/iat.csv")?;
-    ///
-    /// // subset mean ages of debris flows
-    /// let df: Vec<f64> = dep.iter().filter(|x| x.facies == "DF").map(|x| x.age).collect();
-    /// // subset inherited ages
-    /// let ia: Vec<f64> = iat.iter().map(|x| x.age).collect();
-    ///
-    /// let mut debris_flows = Reservoir::new().input(&0.78)?.output(&0.78)?.inherit(&ia);
-    /// debris_flows = debris_flows.sim(&10000.0)?;
-    /// let fit = debris_flows.gof(&df);
-    /// println!("Fit is {:?}.", fit);
-    ///
-    /// Ok(())
+    ///     let ages = vec![10.0, 42.0, 77.7, 12.0, 99.9, 10000.0, 777.7];
+    ///     let mut debris_flows = Reservoir::new()
+    ///         .input(&0.78)?
+    ///         .output(&0.78)?
+    ///         .sim(&4000.0)?;
+    ///     let fit = debris_flows.gof(&ages);
+    ///     println!("Fit is {:?}.", fit);
+    ///     Ok(())
     /// }
     /// ```
     pub fn gof(&self, other: &[f64]) -> Fit {

@@ -27,7 +27,7 @@
 *
 *  - Load the crate prelude in the preamble of your `main.rs`.
 *  - Load charcoal data from headwaters of the OCR:
-* ```rust
+* ```no_run
 * use reservoirs::prelude::*;
 *
 * fn main() -> Result<(), ResError> {
@@ -55,6 +55,7 @@
 * // model parameters
 * let period = 30000.0; // run simulations for 30000 years
 * let runs = 1000; // run 1000 simulated accumulations per candidate pair for goodness-of-fit
+* let bins = 500; // split observation into bins for deriving CDF
 *
 * // create reservoir model using builder pattern
 * let mut model = Model::new(debris_flows)
@@ -62,7 +63,7 @@
 *     .runs(runs);
 *
 * // sample a stereotypical record from 1000 runs of 30000 years
-* let eg = model.stereotype(500);
+* let eg = model.stereotype(bins);
 * // compare the CDF of the synthetic example to the observed debris-flow deposit record
 *   plot::comp_cdf(&eg, &df, "examples/df_cdf.png");
 *
