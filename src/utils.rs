@@ -4,87 +4,6 @@ use realfft::RealFftPlanner;
 use rustfft::num_complex::Complex;
 use serde::Serialize;
 
-/// Convolve frequency distributions along an index of values.
-///
-/// # Examples
-///
-/// ```{rust}
-/// use reservoirs::prelude::*;
-/// fn main () -> Result<(), ResError> {
-///     let two = vec![1.0, 2.0];
-///     let whole = vec![0.5, 0.5];
-///     let four = vec![1.0, 2.0, 3.0, 4.0];
-///     let half = vec![0.0, 0.5, 0.5, 0.0, 0.0];
-///     let quarter = vec![0.0, 0.25, 0.25, 0.25, 0.25];
-///
-///     let three = vec![3.0, 4.0];
-///     let third = vec![0.0, 0.0, 0.0, 0.5, 0.5];
-///
-///     let cdf_two = utils::cdf(&two).iter().map(|(a, b)| *b).collect::<Vec<f64>>();
-///     let cdf_four = utils::cdf(&four).iter().map(|(a, b)| *b).collect::<Vec<f64>>();
-///     let cdf_two_of_four = utils::cdf_rng(&two, &(0..4));
-///     let cdf_three_of_four = utils::cdf_rng(&three, &(0..4));
-///     println!("cdf two of four is {:?}", cdf_two_of_four);
-///     println!("cdf three of four is {:?}", cdf_three_of_four);
-///
-///     let pmf_two = utils::pmf_from_cdf(&cdf_two);
-///     let pmf_four = utils::pmf_from_cdf(&cdf_four);
-///     let pmf_two_of_four = utils::pmf_from_cdf(&cdf_two_of_four);
-///     let pmf_three_of_four = utils::pmf_from_cdf(&cdf_three_of_four);
-///     println!("pmf two of four is {:?}", pmf_two_of_four);
-///     println!("pmf three of four is {:?}", pmf_three_of_four);
-///
-///     let thresh = 0.0001;
-///     for i in 0..pmf_two.len() {
-///         assert_eq!((whole[i] - pmf_two[i]) < thresh, true);
-///     }
-///     for i in 0..pmf_four.len() {
-///         assert_eq!((quarter[i] - pmf_four[i]) < thresh, true);
-///         assert_eq!((half[i] - pmf_two_of_four[i]) < thresh, true);
-///         assert_eq!((third[i] - pmf_three_of_four[i]) < thresh, true);
-///     }
-///     let convo_two_three = utils::convo(&two, &three, 4);
-///     let out_two_three = vec![0.0, 0.25, 0.25, 0.25, 0.25];
-///     println!("convo of two and three is {:?}", convo_two_three);
-///     for i in 0..convo_two_three.len() {
-///         assert_eq!((out_two_three[i] - convo_two_three[i]) < thresh, true);
-///     }
-///
-/// Ok(())
-/// }
-/// ```
-pub fn convo(x: &[f64], y: &[f64], rng: i32) -> Vec<f64> {
-    let len = (rng + 1) as usize;
-    let range = 0..rng;
-
-    let cdf_x = cdf_rng(x, &range);
-    let mut pmf_x = pmf_from_cdf(&cdf_x);
-    let cdf_y = cdf_rng(y, &range);
-    let mut pmf_y = pmf_from_cdf(&cdf_y);
-
-    let mut real_planner = RealFftPlanner::<f64>::new();
-    // create a FFT
-    let r2c = real_planner.plan_fft_forward(len);
-    // make input and output vectors
-    // let mut in_data = r2c.make_input_vec();
-    let mut spectrum_x = r2c.make_output_vec();
-    let mut spectrum_y = r2c.make_output_vec();
-
-    // Forward transform the input data
-    r2c.process(&mut pmf_x, &mut spectrum_x).unwrap();
-    r2c.process(&mut pmf_y, &mut spectrum_y).unwrap();
-    // Add the frequency distributions together
-    let mut spectrum = spectrum_x.iter().zip(spectrum_y.iter())
-        .map(|(a, b)| a + b).collect::<Vec<Complex<f64>>>();
-
-    // create an iFFT and an output vector
-    let c2r = real_planner.plan_fft_inverse(len);
-    let mut out_data = c2r.make_output_vec();
-
-    c2r.process(&mut spectrum, &mut out_data).unwrap();
-    out_data = out_data.iter().map(|a| a / (rng + 1) as f64).collect::<Vec<f64>>();
-    out_data
-}
 
 /// Anderson-Darling Two-Sample Test
 pub fn ad_dual(sample: &[f64], other: &[f64]) -> f64 {
@@ -187,6 +106,55 @@ pub fn cdf_dual(obs: &[f64], other: &[f64]) -> Vec<(f64, f64)> {
     cdf
 }
 
+/// Returns the cdf given a pmf, implementing a cumulative sum over f64 values.
+///
+/// # Examples
+///
+/// ```{rust}
+/// use::reservoirs::prelude::*;
+/// fn main () -> Result<(), ResError> {
+///     let two = vec![1.0, 2.0];
+///     let three = vec![3.0, 4.0];
+///     let four = vec![1.0, 2.0, 3.0, 4.0];
+///
+///     // convert to cdf
+///     let cdf_two = utils::cdf(&two).iter().map(|(a, b)| *b).collect::<Vec<f64>>();
+///     let cdf_four = utils::cdf(&four).iter().map(|(a, b)| *b).collect::<Vec<f64>>();
+///     let cdf_two_of_four = utils::cdf_rng(&two, &(0..4));
+///     let cdf_three_of_four = utils::cdf_rng(&three, &(0..4));
+///
+///     // convert to pmf
+///     let pmf_two = utils::pmf_from_cdf(&cdf_two);
+///     let pmf_four = utils::pmf_from_cdf(&cdf_four);
+///     let pmf_two_of_four = utils::pmf_from_cdf(&cdf_two_of_four);
+///     let pmf_three_of_four = utils::pmf_from_cdf(&cdf_three_of_four);
+///
+///     // convert back to cdf
+///     let two_cdf = utils::cdf_from_pmf(&pmf_two);
+///     let four_cdf = utils::cdf_from_pmf(&pmf_four);
+///     let two_of_four_cdf = utils::cdf_from_pmf(&pmf_two_of_four);
+///     let three_of_four_cdf = utils::cdf_from_pmf(&pmf_three_of_four);
+///
+///     let thresh = 0.0001;
+///     for i in 0..pmf_two.len() {
+///         assert_eq!((two_cdf[i] - cdf_two[i]) < thresh, true);
+///     }
+///     for i in 0..pmf_four.len() {
+///         assert_eq!((four_cdf[i] - cdf_four[i]) < thresh, true);
+///         assert_eq!((two_of_four_cdf[i] - cdf_two_of_four[i]) < thresh, true);
+///         assert_eq!((three_of_four_cdf[i] - cdf_three_of_four[i]) < thresh, true);
+///     }
+///     Ok(())
+/// }
+/// ```
+pub fn cdf_from_pmf(pmf: &[f64]) -> Vec<f64> {
+    let mut acc = 0.0;
+    let res = pmf.iter().map(
+        |x| { acc += *x; acc }
+    ).collect::<Vec<f64>>();
+    res
+}
+
 /// take the cdf of observations over a range of discrete values
 ///  - `obs` is a reference to a slice of f64 values.
 ///  - `range` is range of discrete f64 values.
@@ -239,6 +207,113 @@ pub fn cdf_rng(obs: &[f64], range: &std::ops::Range<i32>) -> Vec<f64> {
         cdf_rng.push(res_max);
     }
     cdf_rng
+}
+
+
+/// Convolve frequency distributions along an index of values.
+///
+/// # Examples
+///
+/// ```{rust}
+/// use reservoirs::prelude::*;
+/// fn main () -> Result<(), ResError> {
+///     let two = vec![1.0, 2.0];
+///     let whole = vec![0.5, 0.5];
+///     let four = vec![1.0, 2.0, 3.0, 4.0];
+///     let half = vec![0.0, 0.5, 0.5, 0.0, 0.0];
+///     let quarter = vec![0.0, 0.25, 0.25, 0.25, 0.25];
+///
+///     let three = vec![3.0, 4.0];
+///     let third = vec![0.0, 0.0, 0.0, 0.5, 0.5];
+///
+///     let cdf_two = utils::cdf(&two).iter().map(|(a, b)| *b).collect::<Vec<f64>>();
+///     let cdf_four = utils::cdf(&four).iter().map(|(a, b)| *b).collect::<Vec<f64>>();
+///     let cdf_two_of_four = utils::cdf_rng(&two, &(0..4));
+///     let cdf_three_of_four = utils::cdf_rng(&three, &(0..4));
+///
+///     let pmf_two = utils::pmf_from_cdf(&cdf_two);
+///     let pmf_four = utils::pmf_from_cdf(&cdf_four);
+///     let pmf_two_of_four = utils::pmf_from_cdf(&cdf_two_of_four);
+///     let pmf_three_of_four = utils::pmf_from_cdf(&cdf_three_of_four);
+///
+///     let thresh = 0.0001;
+///     for i in 0..pmf_two.len() {
+///         assert_eq!((whole[i] - pmf_two[i]) < thresh, true);
+///     }
+///     for i in 0..pmf_four.len() {
+///         assert_eq!((quarter[i] - pmf_four[i]) < thresh, true);
+///         assert_eq!((half[i] - pmf_two_of_four[i]) < thresh, true);
+///         assert_eq!((third[i] - pmf_three_of_four[i]) < thresh, true);
+///     }
+///     let convo_two_three = utils::convo(&two, &three, 4);
+///     let out_two_three = vec![0.0, 0.25, 0.25, 0.25, 0.25];
+///     println!("convo of two and three is {:?}", convo_two_three);
+///     for i in 0..convo_two_three.len() {
+///         assert_eq!((out_two_three[i] - convo_two_three[i]) < thresh, true);
+///     }
+///
+/// Ok(())
+/// }
+/// ```
+pub fn convo(x: &[f64], y: &[f64], rng: i32) -> Vec<f64> {
+    let len = (rng + 1) as usize;
+    let range = 0..rng;
+
+    let cdf_x = cdf_rng(x, &range);
+    let mut pmf_x = pmf_from_cdf(&cdf_x);
+    let cdf_y = cdf_rng(y, &range);
+    let mut pmf_y = pmf_from_cdf(&cdf_y);
+
+    let mut real_planner = RealFftPlanner::<f64>::new();
+    // create a FFT
+    let r2c = real_planner.plan_fft_forward(len);
+    // make input and output vectors
+    // let mut in_data = r2c.make_input_vec();
+    let mut spectrum_x = r2c.make_output_vec();
+    let mut spectrum_y = r2c.make_output_vec();
+
+    // Forward transform the input data
+    r2c.process(&mut pmf_x, &mut spectrum_x).unwrap();
+    r2c.process(&mut pmf_y, &mut spectrum_y).unwrap();
+    // Add the frequency distributions together
+    let mut spectrum = spectrum_x.iter().zip(spectrum_y.iter())
+        .map(|(a, b)| a + b).collect::<Vec<Complex<f64>>>();
+
+    // create an iFFT and an output vector
+    let c2r = real_planner.plan_fft_inverse(len);
+    let mut out_data = c2r.make_output_vec();
+
+    c2r.process(&mut spectrum, &mut out_data).unwrap();
+    out_data = out_data.iter().map(|a| a / (rng + 1) as f64).collect::<Vec<f64>>();
+    out_data
+}
+
+
+/// Produce integer-like index of f64 values from generic range.
+///
+/// # Examples
+///
+/// ```{rust}
+/// use::reservoirs::prelude::*;
+/// fn main() -> Result<(), ResError> {
+///     let five = vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0];
+///     let index = utils::index_f64(0.0, 5.0, 1.0);
+///
+///     let thresh = 0.00001;
+///     for i in 0..=5 {
+///         assert_eq!((five[i] - index[i]) < thresh, true)
+///     }
+///     Ok(())
+/// }
+/// ```
+pub fn index_f64(start: f64, end: f64, step: f64) -> Vec<f64> {
+    let mut k = start;
+    let mut index = Vec::new();
+    while k <= end {
+        index.push(k);
+        k += step;
+    }
+    index
 }
 
 

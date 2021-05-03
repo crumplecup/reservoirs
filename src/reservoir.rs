@@ -533,6 +533,123 @@ impl Model {
         }
     }
 
+/// Return quantiles from transit times.
+///
+/// # Examples
+///
+/// ```{rust}
+/// use::reservoirs::prelude::*;
+/// fn main() -> Result<(), ResError> {
+///     // model parameters
+///     let batch = 10;  // fit 10 input/output pairs at a time using rayon
+///     let period = 3000.0; // run simulations for 10000 years
+///     let runs = 10; // run 100 simulated accumulations per candidate pair for goodness-of-fit
+///
+///     // create reservoir model using builder pattern
+///     let mut model = Model::new(Reservoir::new().input(&0.73)?.output(&0.73)?)
+///         .batch(batch)
+///         .period(&period)
+///         .runs(runs)
+///         .range(period as i32);
+///
+///     let transits = model.fit_transit_time();
+///     Ok(())
+/// }
+/// ```
+    pub fn fit_transit_time(&self) -> Transits {
+        let pmf = self.clone().transit_times();
+        let cdf = utils::cdf_from_pmf(&pmf);
+        let index = utils::index_f64(0.0, pmf.len() as f64, 1.0);
+        let wgt_mn = index.iter().zip(pmf.iter()).map(|(a,b) | a * b).collect::<Vec<f64>>();
+        let mean = wgt_mn.iter().fold(0.0, |acc, x| acc + x);
+        let mut lwr_2s = 0.0;
+        let mut lwr_1s = 0.0;
+        let mut median = 0.0;
+        let mut upr_1s = 0.0;
+        let mut upr_2s = 0.0;
+        let rate = 0.0;
+        let thresh = 0.0005;
+        for i in 0..cdf.len() {
+            if (cdf[i] - 0.025).abs() < thresh {
+                lwr_2s = index[i];
+            }
+            if (cdf[i] - 0.25).abs() < thresh {
+                lwr_1s = index[i];
+            }
+            if (cdf[i] - 0.5).abs() < thresh {
+                median = index[i];
+            }
+            if (cdf[i] - 0.75).abs() < thresh {
+                upr_1s = index[i];
+            }
+            if (cdf[i] - 0.975).abs() < thresh {
+                upr_2s = index[i];
+            }
+        }
+        Transits {
+            rate,
+            lwr_2s,
+            lwr_1s,
+            mean,
+            median,
+            upr_1s,
+            upr_2s,
+        }
+    }
+
+
+/// Returns quantile statistics on transit times for rates in a given range.
+/// Calls [fit_transit_rate](#method.fit_transit_rate).
+///
+/// # Examples
+///
+/// ```rust
+/// use reservoirs::prelude::*;
+/// fn main() -> Result<(), ResError> {
+///     // model parameters
+///     let batch = 10;  // fit 10 input/output pairs at a time using rayon
+///     let period = 3000.0; // run simulations for 10000 years
+///     let runs = 10; // run 100 simulated accumulations per candidate pair for goodness-of-fit
+///
+///     // create reservoir model using builder pattern
+///     let mut model = Model::new(Reservoir::new().input(&0.73)?.output(&0.73)?)
+///         .batch(batch)
+///         .period(&period)
+///         .runs(runs)
+///         .range(period as i32);
+///
+///     let transits = model.transits((0.01..1.5));
+///     Ok(())
+/// }
+/// ```
+    pub fn transits(&mut self, rate: std::ops::Range<f64>) -> Vec<Transits> {
+        info!("Randomly select rates from the given rates to fit.");
+        let mut rates = Vec::with_capacity(self.batch);
+        info!("Clone the parent model and give each copy a different reservoir rate.");
+        let mut fits = Vec::with_capacity(self.batch);
+        for i in 0..self.batch {
+            rates.push(
+                rand::distributions::Uniform::from(rate.clone()).sample(&mut self.reservoir.range),
+            );
+            fits.push(
+                self.clone().reservoir(
+                    self.reservoir
+                        .clone()
+                        .input(&rates[i])
+                        .unwrap()
+                        .output(&rates[i])
+                        .unwrap(),
+                ),
+            );
+        }
+        let mut gof: Vec<Transits> = fits.iter().map(|x| x.clone().fit_transit_time()).collect();
+        for i in 0..rates.len() {
+            gof[i].rate = rates[i];
+        }
+        gof
+    }
+
+
     /// Creates a new model from a given `reservoir` with default `period`, `runs` and `batch` values.
     pub fn new(reservoir: Reservoir) -> Self {
         Model {
@@ -620,7 +737,9 @@ impl Model {
     /// }
     /// ```
     pub fn steady(&mut self, rate: std::ops::Range<f64>, obs: &[f64]) -> Vec<Gof> {
+        info!("Randomly select rates from the given rates to fit.");
         let mut rates = Vec::with_capacity(self.batch);
+        info!("Clone the parent model and give each copy a different reservoir rate.");
         let mut fits = Vec::with_capacity(self.batch);
         for i in 0..self.batch {
             rates.push(
@@ -770,21 +889,20 @@ impl Model {
     /// use reservoirs::prelude::*;
     /// fn main() -> Result<(), ResError> {
     ///
-    /// let period: f64 = 2000.0;  // length of time to simulate accumulation in the reservoir in years
-    /// let runs: usize = 20; // number of simulations to run for estimation
-    /// let df_rt: f64 = 0.72; // rate for steady state debris-flow accumulation
-    /// let until = 4095; // range limit for tracking transit times
+    ///     let period: f64 = 2000.0;  // length of time to simulate accumulation in the reservoir in years
+    ///     let runs: usize = 20; // number of simulations to run for estimation
+    ///     let df_rt: f64 = 0.72; // rate for steady state debris-flow accumulation
+    ///     let until = 4095; // range limit for tracking transit times
     ///
-    /// // to estimate transit times, omit inherit age from charcoal
-    /// let debris_flows = Reservoir::new().input(&df_rt)?.output(&df_rt)?;
-    /// let mut df_mod = Model::new(debris_flows).period(&period).runs(runs).range(until);
+    ///     // to estimate transit times, omit inherit age from charcoal
+    ///     let debris_flows = Reservoir::new().input(&df_rt)?.output(&df_rt)?;
+    ///     let mut df_mod = Model::new(debris_flows).period(&period).runs(runs).range(until);
     ///
-    /// // vector of transit times
-    /// let df_t = df_mod.transit_times();
+    ///     // vector of transit times
+    ///     let df_t = df_mod.transit_times();
+    ///     println!("Debris-flow transit time quantiles are {:?}", utils::quantiles(&df_t));
     ///
-    /// println!("Debris-flow transit time quantiles are {:?}", utils::quantiles(&df_t));
-    ///
-    /// Ok(())
+    ///     Ok(())
     /// }
     /// ```
     pub fn transit_times(&mut self) -> Vec<f64> {
@@ -825,10 +943,10 @@ impl Model {
         let mut out_data = c2r.make_output_vec();
         c2r.process(&mut out, &mut out_data).unwrap();
         info!("Normalize output by dividing by length.");
-        out_data = out_data.iter().map(|a| a / index.len() as f64).collect::<Vec<f64>>();
+        out_data = out_data.par_iter().map(|a| a / index.len() as f64).collect::<Vec<f64>>();
         info!("Normalize output by dividing by sum of pmfs (having added several pmfs together).");
         let sum_out = out_data.iter().fold(0.0, |acc, x| acc + *x);
-        out_data = out_data.iter().map(|a| a / sum_out).collect::<Vec<f64>>();
+        out_data = out_data.par_iter().map(|a| a / sum_out).collect::<Vec<f64>>();
 
         out_data
     }
@@ -881,10 +999,9 @@ impl Reservoir {
     /// let ia: Vec<f64> = iat.iter().map(|x| x.age).collect();
     ///
     /// let mut debris_flows = Reservoir::new().input(&0.78)?.output(&0.78)?.inherit(&ia);
-    /// debris_flows = debris_flows.sim(&30000.0)?;
-    /// let (ks, kp) = debris_flows.gof(&df);
-    /// println!("K-S fit is {}.", ks);
-    /// println!("Kuiper fit is {}.", kp);
+    /// debris_flows = debris_flows.sim(&10000.0)?;
+    /// let fit = debris_flows.gof(&df);
+    /// println!("Fit is {:?}.", fit);
     ///
     /// Ok(())
     /// }
@@ -935,15 +1052,9 @@ impl Reservoir {
     /// ```
     /// use reservoirs::prelude::*;
     /// fn main() -> Result<(), ResError> {
-    /// // mean expected inherited age by facies
-    /// let iat = Sample::read("https://github.com/crumplecup/reservoirs/blob/master/examples/iat.csv")?;
-    ///
-    /// // subset inherited ages
-    /// let ia: Vec<f64> = iat.iter().map(|x| x.age).collect();
-    ///
-    /// let res = Reservoir::new().inherit(&ia);
-    ///
-    /// Ok(())
+    ///     let start_ages = vec![7.0, 42.0, 401.0, 1234.5, 7777.7, 5.2, 0.1];
+    ///     let res = Reservoir::new().inherit(&start_ages);
+    ///     Ok(())
     /// }
     /// ```
     pub fn inherit(mut self, ages: &[f64]) -> Self {
@@ -959,8 +1070,9 @@ impl Reservoir {
     /// ```
     /// use reservoirs::prelude::*;
     /// fn main() -> Result<(), ResError> {
-    /// res = Reservoir::new().input(&0.58)?;
-    /// Ok(())
+    ///     // new reservoirs have no input rate, call input() to set one
+    ///     let mut res = Reservoir::new().input(&0.58)?;
+    ///     Ok(())
     /// }
     /// ```
     pub fn input(mut self, rate: &f64) -> Result<Self, errors::ResError> {
@@ -999,7 +1111,11 @@ impl Reservoir {
     ///
     /// ```
     /// use reservoirs::prelude::*;
-    /// res = Reservoir::new().output(&0.58)?;
+    /// fn main() -> Result<(), ResError> {
+    ///     // new reservoirs have no output rate, call input() to set one
+    ///     let mut res = Reservoir::new().output(&0.58)?;
+    ///     Ok(())
+    /// }
     /// ```
     pub fn output(mut self, rate: &f64) -> Result<Self, errors::ResError> {
         let rate = Exp::new(*rate)?;
@@ -1014,7 +1130,11 @@ impl Reservoir {
     ///
     /// ```
     /// use reservoirs::prelude::*;
-    /// res = Reservoir::new().range(10101);
+    /// fn main() -> Result<(), ResError> {
+    ///     // new reservoirs have a random seed, call range() to set a specific seed
+    ///     let mut res = Reservoir::new().range(10101);
+    ///     Ok(())
+    /// }
     /// ```
     pub fn range(mut self, seed: u64) -> Self {
         self.range = rand::SeedableRng::seed_from_u64(seed);
@@ -1031,15 +1151,16 @@ impl Reservoir {
     ///
     /// ```
     /// use reservoirs::prelude::*;
+    /// fn main () -> Result<(), ResError> {
+    ///     // create reservoirs
+    ///     let mut fines = Reservoir::new().input(&0.75)?.output(&0.75)?;
+    ///     let mut gravels = Reservoir::new().input(&0.54)?.output(&0.54)?;
     ///
-    /// // create reservoirs
-    /// let mut fines = Reservoir::new().input(&0.75)?.output(&0.75)?;
-    /// let mut gravels = Reservoir::new().input(&0.54)?.output(&0.54)?;
-    ///
-    /// // simulate accumulation for 30000 years
-    /// fines = fines.sim(&30000.0)?;
-    /// gravels = gravels.sim(&30000.0)?;
-    ///
+    ///     // simulate accumulation for 30000 years
+    ///     fines = fines.sim(&30000.0)?;
+    ///     gravels = gravels.sim(&30000.0)?;
+    ///     Ok(())
+    /// }
     /// ```
     pub fn sim(mut self, period: &f64) -> Result<Self, errors::ResError> {
         let _ = pretty_env_logger::try_init();
@@ -1123,6 +1244,18 @@ impl Sample {
         }
         Ok(record)
     }
+}
+
+/// Struct to hold statistics describing transit times of reservoirs.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Transits {
+    rate: f64,
+    lwr_2s: f64,
+    lwr_1s: f64,
+    mean: f64,
+    median: f64,
+    upr_1s: f64,
+    upr_2s: f64,
 }
 
 /// The Record trait indicates the data is organized in spreadsheet format with
