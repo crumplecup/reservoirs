@@ -533,6 +533,30 @@ impl Model {
         }
     }
 
+/// Return quantile statistics for transit times at randomly selected rates for a given duration.
+/// Calls [transits](#method.transits).
+    pub fn fit_transits(&mut self, rate: std::ops::Range<f64>, title: &str) -> Result<(), errors::ResError> {
+        let dur = std::time::Duration::new(60 * 60 * self.duration, 0);
+        let now = std::time::SystemTime::now();
+        let mut rec = Vec::new();
+        let exists = std::path::Path::new(title).exists();
+        match exists {
+            true => {
+                let mut stats: Vec<Transits> = Transits::read(title)?;
+                rec.append(&mut stats);
+            }
+            false => {}
+        }
+        while std::time::SystemTime::now() < now + dur {
+            let mut new = self.transits(rate.clone());
+            {
+                rec.append(&mut new);
+            }
+            utils::record(&mut rec, title)?;
+        }
+        Ok(())
+    }
+
 /// Return quantiles from transit times.
 ///
 /// # Examples
@@ -1256,6 +1280,22 @@ pub struct Transits {
     median: f64,
     upr_1s: f64,
     upr_2s: f64,
+}
+
+impl Transits {
+    /// Convert csv record to Transits struct.
+    pub fn read(path: &str) -> Result<Vec<Transits>, errors::ResError> {
+        let mut rec = Vec::new();
+        let var = std::fs::File::open(path)?;
+        let mut rdr = csv::Reader::from_reader(var);
+        for result in rdr.records() {
+            let row = result?;
+            let row: Transits = row.deserialize(None)?;
+            rec.push(row);
+        }
+        Ok(rec)
+    }
+
 }
 
 /// The Record trait indicates the data is organized in spreadsheet format with

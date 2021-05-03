@@ -2,7 +2,7 @@ use crate::errors;
 use rand::seq::IteratorRandom;
 use realfft::RealFftPlanner;
 use rustfft::num_complex::Complex;
-use serde::Serialize;
+use serde::{Serialize};
 
 
 /// Anderson-Darling Two-Sample Test
