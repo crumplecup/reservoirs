@@ -6,10 +6,9 @@ use log::*;
 use rand::SeedableRng;
 use rand_distr::{Distribution, Exp};
 use rayon::prelude::*;
-use serde::{Deserialize, Serialize};
 use realfft::RealFftPlanner;
 use rustfft::num_complex::Complex;
-
+use serde::{Deserialize, Serialize};
 
 /// Holder struct for passing test values between functions.
 /// Makes functions calls and returns less confusing.
@@ -533,9 +532,13 @@ impl Model {
         }
     }
 
-/// Return quantile statistics for transit times at randomly selected rates for a given duration.
-/// Calls [transits](#method.transits).
-    pub fn fit_transits(&mut self, rate: std::ops::Range<f64>, title: &str) -> Result<(), errors::ResError> {
+    /// Return quantile statistics for transit times at randomly selected rates for a given duration.
+    /// Calls [transits](#method.transits).
+    pub fn fit_transits(
+        &mut self,
+        rate: std::ops::Range<f64>,
+        title: &str,
+    ) -> Result<(), errors::ResError> {
         let dur = std::time::Duration::new(60 * 60 * self.duration, 0);
         let now = std::time::SystemTime::now();
         let mut rec = Vec::new();
@@ -557,95 +560,65 @@ impl Model {
         Ok(())
     }
 
-/// Return quantiles from transit times.
-///
-/// # Examples
-///
-/// ```{rust}
-/// use::reservoirs::prelude::*;
-/// fn main() -> Result<(), ResError> {
-///     // model parameters
-///     let batch = 10;  // fit 10 input/output pairs at a time using rayon
-///     let period = 3000.0; // run simulations for 10000 years
-///     let runs = 10; // run 100 simulated accumulations per candidate pair for goodness-of-fit
-///
-///     // create reservoir model using builder pattern
-///     let mut model = Model::new(Reservoir::new().input(&0.73)?.output(&0.73)?)
-///         .batch(batch)
-///         .period(&period)
-///         .runs(runs)
-///         .range(period as i32);
-///
-///     let transits = model.fit_transit_time();
-///     Ok(())
-/// }
-/// ```
-    pub fn fit_transit_time(&self) -> Transits {
+    /// Return quantiles from transit times.
+    ///
+    /// # Examples
+    ///
+    /// ```{rust}
+    /// use::reservoirs::prelude::*;
+    /// fn main() -> Result<(), ResError> {
+    ///     // model parameters
+    ///     let batch = 10;  // fit 10 input/output pairs at a time using rayon
+    ///     let period = 3000.0; // run simulations for 10000 years
+    ///     let runs = 10; // run 100 simulated accumulations per candidate pair for goodness-of-fit
+    ///
+    ///     // create reservoir model using builder pattern
+    ///     let mut model = Model::new(Reservoir::new().input(&0.73)?.output(&0.73)?)
+    ///         .batch(batch)
+    ///         .period(&period)
+    ///         .runs(runs)
+    ///         .range(period as i32);
+    ///
+    ///     let transits = model.fit_transit_time();
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn fit_transit_time(&mut self) -> f64 {
         let pmf = self.clone().transit_times();
-        let cdf = utils::cdf_from_pmf(&pmf);
         let index = utils::index_f64(0.0, pmf.len() as f64, 1.0);
-        let wgt_mn = index.iter().zip(pmf.iter()).map(|(a,b) | a * b).collect::<Vec<f64>>();
+        let wgt_mn = index
+            .iter()
+            .zip(pmf.iter())
+            .map(|(a, b)| a * b)
+            .collect::<Vec<f64>>();
         let mean = wgt_mn.iter().fold(0.0, |acc, x| acc + x);
-        let mut lwr_2s = 0.0;
-        let mut lwr_1s = 0.0;
-        let mut median = 0.0;
-        let mut upr_1s = 0.0;
-        let mut upr_2s = 0.0;
-        let rate = 0.0;
-        let thresh = 0.001;
-        for i in 0..cdf.len() {
-            if (cdf[i] - 0.025).abs() < thresh {
-                lwr_2s = index[i];
-            }
-            if (cdf[i] - 0.25).abs() < thresh {
-                lwr_1s = index[i];
-            }
-            if (cdf[i] - 0.5).abs() < thresh {
-                median = index[i];
-            }
-            if (cdf[i] - 0.75).abs() < thresh {
-                upr_1s = index[i];
-            }
-            if (cdf[i] - 0.975).abs() < thresh {
-                upr_2s = index[i];
-            }
-        }
-        Transits {
-            rate,
-            lwr_2s,
-            lwr_1s,
-            mean,
-            median,
-            upr_1s,
-            upr_2s,
-        }
+        mean
     }
 
-
-/// Returns quantile statistics on transit times for rates in a given range.
-/// Calls [fit_transit_rate](#method.fit_transit_rate).
-///
-/// # Examples
-///
-/// ```rust
-/// use reservoirs::prelude::*;
-/// fn main() -> Result<(), ResError> {
-///     // model parameters
-///     let batch = 10;  // fit 10 input/output pairs at a time using rayon
-///     let period = 3000.0; // run simulations for 10000 years
-///     let runs = 10; // run 100 simulated accumulations per candidate pair for goodness-of-fit
-///
-///     // create reservoir model using builder pattern
-///     let mut model = Model::new(Reservoir::new().input(&0.73)?.output(&0.73)?)
-///         .batch(batch)
-///         .period(&period)
-///         .runs(runs)
-///         .range(period as i32);
-///
-///     let transits = model.transits((0.01..1.5));
-///     Ok(())
-/// }
-/// ```
+    /// Returns quantile statistics on transit times for rates in a given range.
+    /// Calls [fit_transit_rate](#method.fit_transit_rate).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use reservoirs::prelude::*;
+    /// fn main() -> Result<(), ResError> {
+    ///     // model parameters
+    ///     let batch = 10;  // fit 10 input/output pairs at a time using rayon
+    ///     let period = 3000.0; // run simulations for 10000 years
+    ///     let runs = 10; // run 100 simulated accumulations per candidate pair for goodness-of-fit
+    ///
+    ///     // create reservoir model using builder pattern
+    ///     let mut model = Model::new(Reservoir::new().input(&0.73)?.output(&0.73)?)
+    ///         .batch(batch)
+    ///         .period(&period)
+    ///         .runs(runs)
+    ///         .range(period as i32);
+    ///
+    ///     let transits = model.transits((0.01..1.5));
+    ///     Ok(())
+    /// }
+    /// ```
     pub fn transits(&mut self, rate: std::ops::Range<f64>) -> Vec<Transits> {
         info!("Randomly select rates from the given rates to fit.");
         let mut rates = Vec::with_capacity(self.batch);
@@ -666,13 +639,14 @@ impl Model {
                 ),
             );
         }
-        let mut gof: Vec<Transits> = fits.iter().map(|x| x.clone().fit_transit_time()).collect();
-        for i in 0..rates.len() {
-            gof[i].rate = rates[i];
-        }
-        gof
+        let stats: Vec<f64> = fits.iter().map(|x| x.clone().fit_transit_time()).collect();
+        let transits: Vec<Transits> = stats
+            .iter()
+            .zip(rates.iter())
+            .map(|(a, b)| Transits { rate: *a, mean: *b })
+            .collect();
+        transits
     }
-
 
     /// Creates a new model from a given `reservoir` with default `period`, `runs` and `batch` values.
     pub fn new(reservoir: Reservoir) -> Self {
@@ -950,7 +924,7 @@ impl Model {
         let mut out = vec![Complex::new(0.0, 0.0); index.len()];
         let mut real_planner = RealFftPlanner::<f64>::new();
         info!("Constructing FftPlanner for fourier transforms.");
-        let r2c = real_planner.plan_fft_forward(index.len()+1);
+        let r2c = real_planner.plan_fft_forward(index.len() + 1);
         for r in res {
             let cdf = utils::cdf_rng(&r.mass, &index);
             let mut pmf = utils::pmf_from_cdf(&cdf);
@@ -958,19 +932,28 @@ impl Model {
             info!("Forward transforming the pmf using fft.");
             r2c.process(&mut pmf, &mut spectrum).unwrap();
             info!("Summing transformed pmfs.");
-            out = out.iter().zip(spectrum.iter())
-                .map(|(a, b)| a + b).collect::<Vec<Complex<f64>>>();
+            out = out
+                .iter()
+                .zip(spectrum.iter())
+                .map(|(a, b)| a + b)
+                .collect::<Vec<Complex<f64>>>();
         }
         info!("Constructing FftPlanner for inverse fourier transforms.");
-        let c2r = real_planner.plan_fft_inverse(index.len()+1);
+        let c2r = real_planner.plan_fft_inverse(index.len() + 1);
         info!("Inverse fourier transform using fft.");
         let mut out_data = c2r.make_output_vec();
         c2r.process(&mut out, &mut out_data).unwrap();
         info!("Normalize output by dividing by length.");
-        out_data = out_data.par_iter().map(|a| a / index.len() as f64).collect::<Vec<f64>>();
+        out_data = out_data
+            .par_iter()
+            .map(|a| a / index.len() as f64)
+            .collect::<Vec<f64>>();
         info!("Normalize output by dividing by sum of pmfs (having added several pmfs together).");
         let sum_out = out_data.iter().fold(0.0, |acc, x| acc + *x);
-        out_data = out_data.par_iter().map(|a| a / sum_out).collect::<Vec<f64>>();
+        out_data = out_data
+            .par_iter()
+            .map(|a| a / sum_out)
+            .collect::<Vec<f64>>();
 
         out_data
     }
@@ -1274,12 +1257,7 @@ impl Sample {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Transits {
     rate: f64,
-    lwr_2s: f64,
-    lwr_1s: f64,
     mean: f64,
-    median: f64,
-    upr_1s: f64,
-    upr_2s: f64,
 }
 
 impl Transits {
@@ -1295,7 +1273,6 @@ impl Transits {
         }
         Ok(rec)
     }
-
 }
 
 /// The Record trait indicates the data is organized in spreadsheet format with

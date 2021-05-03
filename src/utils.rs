@@ -2,8 +2,7 @@ use crate::errors;
 use rand::seq::IteratorRandom;
 use realfft::RealFftPlanner;
 use rustfft::num_complex::Complex;
-use serde::{Serialize};
-
+use serde::Serialize;
 
 /// Anderson-Darling Two-Sample Test
 pub fn ad_dual(sample: &[f64], other: &[f64]) -> f64 {
@@ -149,9 +148,13 @@ pub fn cdf_dual(obs: &[f64], other: &[f64]) -> Vec<(f64, f64)> {
 /// ```
 pub fn cdf_from_pmf(pmf: &[f64]) -> Vec<f64> {
     let mut acc = 0.0;
-    let res = pmf.iter().map(
-        |x| { acc += *x; acc }
-    ).collect::<Vec<f64>>();
+    let res = pmf
+        .iter()
+        .map(|x| {
+            acc += *x;
+            acc
+        })
+        .collect::<Vec<f64>>();
     res
 }
 
@@ -208,7 +211,6 @@ pub fn cdf_rng(obs: &[f64], range: &std::ops::Range<i32>) -> Vec<f64> {
     }
     cdf_rng
 }
-
 
 /// Convolve frequency distributions along an index of values.
 ///
@@ -276,18 +278,23 @@ pub fn convo(x: &[f64], y: &[f64], rng: i32) -> Vec<f64> {
     r2c.process(&mut pmf_x, &mut spectrum_x).unwrap();
     r2c.process(&mut pmf_y, &mut spectrum_y).unwrap();
     // Add the frequency distributions together
-    let mut spectrum = spectrum_x.iter().zip(spectrum_y.iter())
-        .map(|(a, b)| a + b).collect::<Vec<Complex<f64>>>();
+    let mut spectrum = spectrum_x
+        .iter()
+        .zip(spectrum_y.iter())
+        .map(|(a, b)| a + b)
+        .collect::<Vec<Complex<f64>>>();
 
     // create an iFFT and an output vector
     let c2r = real_planner.plan_fft_inverse(len);
     let mut out_data = c2r.make_output_vec();
 
     c2r.process(&mut spectrum, &mut out_data).unwrap();
-    out_data = out_data.iter().map(|a| a / (rng + 1) as f64).collect::<Vec<f64>>();
+    out_data = out_data
+        .iter()
+        .map(|a| a / (rng + 1) as f64)
+        .collect::<Vec<f64>>();
     out_data
 }
-
 
 /// Produce integer-like index of f64 values from generic range.
 ///
@@ -315,7 +322,6 @@ pub fn index_f64(start: f64, end: f64, step: f64) -> Vec<f64> {
     }
     index
 }
-
 
 /// Calculates the low point along `y` and returns the value of `x` at the low point.
 pub fn low_point(x: &[f64], y: &[f64]) -> f64 {
@@ -435,7 +441,6 @@ pub fn pmf_from_cdf(cdf: &[f64]) -> Vec<f64> {
     f
 }
 
-
 /// Calculate the value of the CDF of `obs` at a given threshold `thresh`.
 /// Called by [quantiles](#method.quantiles).
 pub fn quantile(obs: &[f64], thresh: &f64) -> f64 {
@@ -461,7 +466,6 @@ pub fn quantiles(obs: &[f64]) -> Vec<f64> {
     ];
     quants
 }
-
 
 /// Read data from csv file.
 pub fn read_f64(path: &str) -> Result<Vec<f64>, errors::ResError> {
