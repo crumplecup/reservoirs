@@ -592,7 +592,7 @@ impl Model {
         let mut upr_1s = 0.0;
         let mut upr_2s = 0.0;
         let rate = 0.0;
-        let thresh = 0.0005;
+        let thresh = 0.001;
         for i in 0..cdf.len() {
             if (cdf[i] - 0.025).abs() < thresh {
                 lwr_2s = index[i];
