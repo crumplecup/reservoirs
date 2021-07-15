@@ -3,7 +3,7 @@ use crate::errors;
 use crate::plot;
 use crate::utils;
 use log::*;
-use rand::SeedableRng;
+use rand::{Rng, SeedableRng};
 use rand_distr::{Distribution, Exp};
 use rayon::prelude::*;
 use realfft::RealFftPlanner;
@@ -530,7 +530,7 @@ impl Model {
         Ok(())
     }
 
-    /// Return quantiles from transit times.
+    /// Return weighted mean transit time of particles in the reservoir.
     ///
     /// # Examples
     ///
@@ -539,8 +539,8 @@ impl Model {
     /// fn main() -> Result<(), ResError> {
     ///     // model parameters
     ///     let batch = 10;  // fit 10 input/output pairs at a time using rayon
-    ///     let period = 3000.0; // run simulations for 10000 years
-    ///     let runs = 10; // run 100 simulated accumulations per candidate pair for goodness-of-fit
+    ///     let period = 3000.0; // run simulations for 3000 years
+    ///     let runs = 10; // run 10 simulated accumulations per candidate pair for goodness-of-fit
     ///
     ///     // create reservoir model using builder pattern
     ///     let mut model = Model::new(Reservoir::new().input(&0.73)?.output(&0.73)?)
@@ -575,8 +575,8 @@ impl Model {
     /// fn main() -> Result<(), ResError> {
     ///     // model parameters
     ///     let batch = 10;  // fit 10 input/output pairs at a time using rayon
-    ///     let period = 3000.0; // run simulations for 10000 years
-    ///     let runs = 10; // run 100 simulated accumulations per candidate pair for goodness-of-fit
+    ///     let period = 3000.0; // run simulations for 3000 years
+    ///     let runs = 10; // run 10 simulated accumulations per candidate pair for goodness-of-fit
     ///
     ///     // create reservoir model using builder pattern
     ///     let mut model = Model::new(Reservoir::new().input(&0.73)?.output(&0.73)?)
@@ -913,6 +913,117 @@ impl Default for Model {
     }
 }
 
+/// Model framework for fluvial traversal
+#[derive(Clone, Debug)]
+pub struct FluvialModel {
+    res: Fluvial,
+    period: f64,
+}
+
+/// Fluvial traversal struct for gravels and fines.
+#[derive(Clone, Debug)]
+pub struct Fluvial {
+    flux: Vec<f64>,
+    mass: Vec<f64>,
+    period: f64,
+    rate: f64,
+    source: Vec<Reservoir>,
+}
+
+impl Fluvial {
+    /// New fluvial struct
+    pub fn new() -> Fluvial {
+        Fluvial {
+            flux: Vec::new(),
+            mass: Vec::new(),
+            period: 0.0,
+            rate: 0.0,
+            source: Vec::new(),
+        }
+    }
+
+    /// Represents the exit probability of particles from the reservoir.
+    pub fn period(mut self, period: &f64) -> Self {
+        self.period = period.to_owned();
+        self
+    }
+
+    /// Represents the exit probability of particles from the reservoir.
+    pub fn rate(mut self, rate: &f64) -> Self {
+        self.rate = rate.to_owned();
+        self
+    }
+
+    /// Prints csv of reservoir mass to file path.
+    pub fn record_mass(mut self, path: &str) -> Result<(), errors::ResError> {
+        utils::record(&mut self.mass, path)?;
+        Ok(())
+    }
+
+    /// Simulates removal from the reservoir over time based on the rate.
+    pub fn sim(mut self, period: &f64) -> Self {
+        let mut source_flux = Vec::new();
+        let inherited_ages = self.source[1].inherit.clone().unwrap();
+        let mut rng = self.source[1].range.clone();
+        for i in self.source.clone() {
+            source_flux.extend(i.sim(period).unwrap().flux);
+        }
+        let mut t = 0.0;
+        let mut flux: Vec<f64> = Vec::new();
+        let mut storage: Vec<f64> = Vec::new();
+
+        while t < *period {
+            info!("Partitioning sources for removal.");
+            storage.extend(
+                source_flux
+                    .iter()
+                    .cloned()
+                    .filter(|x| x <= &t)
+                    .collect::<Vec<f64>>(),
+            );
+            source_flux = source_flux.iter().cloned().filter(|x| x > &t).collect();
+            info!("Selecting from inputs present before time of removal.");
+            if !storage.is_empty() {
+                for _ in 0..storage.len() {
+                    let roll = rng.gen_range(0.0..1.0);
+                    if roll < self.rate {
+                        let rm =
+                            rand::distributions::Uniform::from(0..storage.len()).sample(&mut rng);
+                        flux.push(storage[rm]);
+                        storage.remove(rm);
+                    }
+                }
+            }
+            t += 1.0;
+        }
+        info!("Converting times to before present.");
+        storage = storage.par_iter().map(|x| period - x).collect();
+        info!("Adding inherited age.");
+        storage = storage
+            .iter()
+            .map(|z| {
+                z + inherited_ages
+                    [rand::distributions::Uniform::from(0..storage.len()).sample(&mut rng)]
+            })
+            .collect();
+        self.flux = flux;
+        self.mass = storage;
+        self
+    }
+
+    /// Sets source reservoirs.
+    pub fn source(mut self, source: &[Reservoir]) -> Self {
+        self.source = source.to_owned();
+        self
+    }
+}
+
+impl Default for Fluvial {
+    fn default() -> Fluvial {
+        Fluvial::new()
+    }
+}
+
 /// Struct for recording reservoir characteristics.
 #[derive(Clone, Debug)]
 pub struct Reservoir {
@@ -1106,8 +1217,8 @@ impl Reservoir {
         let _ = pretty_env_logger::try_init();
         let mut om = 0f64;
         let mut im = 0f64;
+        let mut flux = Vec::new();
         let mut mass = Vec::new(); // time of arrivals in reservoir
-                                   // let mut flux = Vec::new();  //
 
         while om < *period {
             info!("Generating a time for removal.");
@@ -1132,7 +1243,7 @@ impl Reservoir {
                 if !mvec.is_empty() {
                     let rm =
                         rand::distributions::Uniform::from(0..mvec.len()).sample(&mut self.range);
-                    // flux.push(mass[rm]);
+                    flux.push(mass[rm]);
                     mass.remove(rm);
                 }
             }
@@ -1146,11 +1257,11 @@ impl Reservoir {
                 .iter()
                 .map(|z| z + x[rand::distributions::Uniform::from(0..ln).sample(&mut self.range)])
                 .collect();
-            // flux = flux.iter().map(|z| z + x[Uniform::from(0..ln).sample(&mut rng)]).collect();
+            // flux = flux.iter().map(|z| z + x[rand::distributions::Uniform::from(0..ln).sample(&mut self.range)]).collect();
         }
 
         self.mass = mass;
-        // self.flux = flux;
+        self.flux = flux;
         Ok(self)
     }
 }
