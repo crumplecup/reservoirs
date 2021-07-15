@@ -1003,7 +1003,7 @@ impl Fluvial {
             .iter()
             .map(|z| {
                 z + inherited_ages
-                    [rand::distributions::Uniform::from(0..storage.len()).sample(&mut rng)]
+                    [rand::distributions::Uniform::from(0..inherited_ages.len()).sample(&mut rng)]
             })
             .collect();
         self.flux = flux;
