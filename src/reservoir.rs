@@ -972,19 +972,26 @@ impl Fluvial {
 
         let mut t = 0.0;
         let mut flux: Vec<f64> = Vec::new();
-        let mut storage: Vec<f64> = Vec::new();
-        // let mut trapped: Vec<f64> = Vec::new();
+        // let mut storage: Vec<f64> = Vec::new();
 
         let _ = pretty_env_logger::try_init();
-        // let mut ti = 0f64;
-        // let mut gravels = Vec::new();
+        let mut ti = 0f64;
+        let mut gravels = Vec::new();
+        let mut trapped: Vec<f64> = Vec::new();
+        let mut gravel_bin: Vec<f64> = Vec::new();
+        let mut trap_bin: Vec<f64> = Vec::new();
 
-        /*
+
         info!("Generating inputs until time for removal.");
         if let Some(x) = self.source[0].input {
             while ti < *period {
                 ti += x.sample(&mut rng) as f64;
-                gravels.push(ti);
+                let roll = rng.gen_range(0.0..1.0);
+                if roll < 0.5 {
+                    gravels.push(ti);
+                } else {
+                    trapped.push(ti);
+                }
             }
         }
 
@@ -997,7 +1004,7 @@ impl Fluvial {
             }
 
             info!("Partitioning sources for removal.");
-            storage.extend(
+            gravel_bin.extend(
                 gravels
                     .iter()
                     .cloned()
@@ -1005,19 +1012,54 @@ impl Fluvial {
                     .collect::<Vec<f64>>(),
             );
             gravels = gravels.iter().cloned().filter(|x| x > &t).collect();
-            // let roll = rng.gen_range(0.0..1.0);
-            if !storage.is_empty() {
-                let rm =
-                    rand::distributions::Uniform::from(0..storage.len()).sample(&mut rng);
-                flux.push(storage[rm]);
-                storage.remove(rm);
-
+            trap_bin.extend(
+                trapped
+                    .iter()
+                    .cloned()
+                    .filter(|x| x <= &t)
+                    .collect::<Vec<f64>>(),
+            );
+            trapped = trapped.iter().cloned().filter(|x| x > &t).collect();
+            let roll = rng.gen_range(0.0..1.0);
+            if roll < self.rate {
+                if !gravel_bin.is_empty() {
+                    let rm =
+                        rand::distributions::Uniform::from(0..gravel_bin.len()).sample(&mut rng);
+                    flux.push(gravel_bin[rm]);
+                    gravel_bin.remove(rm);
+                } else if !trap_bin.is_empty() {
+                        let rm =
+                            rand::distributions::Uniform::from(0..trap_bin.len()).sample(&mut rng);
+                        flux.push(trap_bin[rm]);
+                        trap_bin.remove(rm);
+                }
             }
-
         }
+        info!("Converting times to before present.");
+        gravel_bin = gravel_bin.par_iter().map(|x| period - x).collect();
+        trap_bin = trap_bin.par_iter().map(|x| period - x).collect();
+        info!("Adding inherited age.");
+        gravel_bin = gravel_bin
+            .iter()
+            .map(|z| {
+                z + inherited_ages
+                    [rand::distributions::Uniform::from(0..inherited_ages.len()).sample(&mut rng)]
+            })
+            .collect();
+        trap_bin = trap_bin
+            .iter()
+            .map(|z| {
+                z + inherited_ages
+                    [rand::distributions::Uniform::from(0..inherited_ages.len()).sample(&mut rng)]
+            })
+            .collect();
+        self.flux = flux;
+        gravel_bin.extend(trap_bin);
+        self.mass = gravel_bin;
+        self
+    }
 
-
-         */
+        /*
 
         while t < *period {
             match self.source[0].output {
@@ -1042,7 +1084,7 @@ impl Fluvial {
             }
         }
 
-/*        while t < *period {
+        while t < *period {
             info!("Partitioning sources for removal.");
             storage.extend(
                 source_flux
@@ -1065,7 +1107,8 @@ impl Fluvial {
                 }
             }
             t += 1.0;
-        }*/
+        }
+
 
 
         info!("Converting times to before present.");
@@ -1082,6 +1125,8 @@ impl Fluvial {
         self.mass = storage;
         self
     }
+
+         */
 
     /// Sets source reservoirs.
     pub fn source(mut self, source: &[Reservoir]) -> Self {
