@@ -963,8 +963,8 @@ impl Fluvial {
     /// Simulates removal from the reservoir over time based on the rate.
     pub fn sim(mut self, period: &f64) -> Self {
         let mut source_flux = Vec::new();
-        let inherited_ages = self.source[1].inherit.clone().unwrap();
-        let mut rng = self.source[1].range.clone();
+        let inherited_ages = self.source[0].inherit.clone().unwrap();
+        let mut rng = self.source[0].range.clone();
         for i in self.source.clone() {
             source_flux.extend(i.sim(period).unwrap().flux);
         }
@@ -985,12 +985,10 @@ impl Fluvial {
             info!("Selecting from inputs present before time of removal.");
             if !storage.is_empty() {
                 for _ in 0..storage.len() {
-                    println!("Entering storage.");
                     let roll = rng.gen_range(0.0..1.0);
                     if roll < self.rate {
                         let rm =
                             rand::distributions::Uniform::from(0..storage.len()).sample(&mut rng);
-                        println!("Rate drawn is {}", rm);
                         flux.push(storage[rm]);
                         storage.remove(rm);
                     }
