@@ -974,28 +974,69 @@ impl Fluvial {
         let mut t = 0.0;
         let mut flux: Vec<f64> = Vec::new();
         let mut storage: Vec<f64> = Vec::new();
-        // let mut trapped: Vec<f64> = Vec::new();
+        let mut trapped: Vec<f64> = Vec::new();
+
+        let _ = pretty_env_logger::try_init();
+        let mut ti = 0f64;
+        let mut gravels = Vec::new();
 
         while t < *period {
             info!("Generating a time for removal.");
+
             match self.source[0].output {
                 Some(x) => t += x.sample(&mut rng) as f64,
                 None => continue,
             }
+
+            while ti < t {
+                info!("Generating inputs until time for removal.");
+                if let Some(x) = self.source[0].input {
+                    ti += x.sample(&mut rng) as f64;
+                    gravels.push(ti);
+                }
+            }
+
+            if !gravels.is_empty() {
+                info!("Inputs are available for removal.");
+                let mvec: Vec<f64> = gravels.iter().cloned().filter(|x| x <= &t).collect();
+                info!("Selecting from inputs present before time of removal.");
+                if !mvec.is_empty() {
+                    let roll = rng.gen_range(0.0..1.0);
+                    let rm =
+                        rand::distributions::Uniform::from(0..mvec.len()).sample(&mut rng);
+                    if roll < self.rate {
+                        trapped.push(gravels[rm]);
+                    } else {
+                        flux.push(gravels[rm]);
+                    }
+                    gravels.remove(rm);
+                }
+            }
+        }
+
+        t = 0.0;
+        while t < *period {
+            info!("Generating a time for removal.");
+
+            match self.source[0].output {
+                Some(x) => t += x.sample(&mut rng) as f64,
+                None => continue,
+            }
+
             info!("Partitioning sources for removal.");
             storage.extend(
-                source_flux
+                trapped
                     .iter()
                     .cloned()
                     .filter(|x| x <= &t)
                     .collect::<Vec<f64>>(),
             );
-            source_flux = source_flux.iter().cloned().filter(|x| x > &t).collect();
+            trapped = trapped.iter().cloned().filter(|x| x > &t).collect();
             // let roll = rng.gen_range(0.0..1.0);
             if !storage.is_empty() {
                 let rm =
                     rand::distributions::Uniform::from(0..storage.len()).sample(&mut rng);
-                flux.push(storage[rm]);
+                gravels.push(storage[rm]);
                 storage.remove(rm);
 
             }
@@ -1029,9 +1070,9 @@ impl Fluvial {
 
          */
         info!("Converting times to before present.");
-        storage = storage.par_iter().map(|x| period - x).collect();
+        gravels = gravels.par_iter().map(|x| period - x).collect();
         info!("Adding inherited age.");
-        storage = storage
+        gravels = gravels
             .iter()
             .map(|z| {
                 z + inherited_ages
@@ -1039,7 +1080,7 @@ impl Fluvial {
             })
             .collect();
         self.flux = flux;
-        self.mass = storage;
+        self.mass = gravels;
         self
     }
 
