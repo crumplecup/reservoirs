@@ -988,7 +988,8 @@ impl Fluvial {
                     .collect::<Vec<f64>>(),
             );
             source_flux = source_flux.iter().cloned().filter(|x| x > &t).collect();
-            if !storage.is_empty() {
+            let roll = rng.gen_range(0.0..1.0);
+            if !storage.is_empty() && roll < self.rate {
                 let rm =
                     rand::distributions::Uniform::from(0..storage.len()).sample(&mut rng);
                 flux.push(storage[rm]);
