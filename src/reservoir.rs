@@ -1019,8 +1019,30 @@ impl Fluvial {
 
          */
 
-
         while t < *period {
+            match self.source[0].output {
+                Some(x) => t += x.sample(&mut rng) as f64,
+                None => continue,
+            }
+            info!("Partitioning sources for removal.");
+            storage.extend(
+                source_flux
+                    .iter()
+                    .cloned()
+                    .filter(|x| x <= &t)
+                    .collect::<Vec<f64>>(),
+            );
+            source_flux = source_flux.iter().cloned().filter(|x| x > &t).collect();
+            info!("Selecting from inputs present before time of removal.");
+            if !storage.is_empty() {
+                let rm =
+                    rand::distributions::Uniform::from(0..storage.len()).sample(&mut rng);
+                flux.push(storage[rm]);
+                storage.remove(rm);
+            }
+        }
+
+/*        while t < *period {
             info!("Partitioning sources for removal.");
             storage.extend(
                 source_flux
@@ -1043,7 +1065,7 @@ impl Fluvial {
                 }
             }
             t += 1.0;
-        }
+        }*/
 
 
         info!("Converting times to before present.");
