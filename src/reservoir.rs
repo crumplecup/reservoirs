@@ -971,7 +971,33 @@ impl Fluvial {
         let mut t = 0.0;
         let mut flux: Vec<f64> = Vec::new();
         let mut storage: Vec<f64> = Vec::new();
+        // let mut trapped: Vec<f64> = Vec::new();
 
+        while t < *period {
+            info!("Generating a time for removal.");
+            match self.source[0].output {
+                Some(x) => t += x.sample(&mut rng) as f64,
+                None => continue,
+            }
+            info!("Partitioning sources for removal.");
+            storage.extend(
+                source_flux
+                    .iter()
+                    .cloned()
+                    .filter(|x| x <= &t)
+                    .collect::<Vec<f64>>(),
+            );
+            source_flux = source_flux.iter().cloned().filter(|x| x > &t).collect();
+            if !storage.is_empty() {
+                let rm =
+                    rand::distributions::Uniform::from(0..storage.len()).sample(&mut rng);
+                flux.push(storage[rm]);
+                storage.remove(rm);
+
+            }
+
+        }
+        /*
         while t < *period {
             info!("Partitioning sources for removal.");
             storage.extend(
@@ -989,13 +1015,15 @@ impl Fluvial {
                     if roll < self.rate {
                         let rm =
                             rand::distributions::Uniform::from(0..storage.len()).sample(&mut rng);
-                        flux.push(storage[rm]);
+                        trapped.push(storage[rm]);
                         storage.remove(rm);
                     }
                 }
             }
             t += 1.0;
         }
+
+         */
         info!("Converting times to before present.");
         storage = storage.par_iter().map(|x| period - x).collect();
         info!("Adding inherited age.");
