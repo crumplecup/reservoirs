@@ -966,8 +966,11 @@ impl Fluvial {
         let inherited_ages = self.source[0].inherit.clone().unwrap();
         let mut rng = self.source[0].range.clone();
         for i in self.source.clone() {
-            source_flux.extend(i.sim(period).unwrap().flux);
+            let res = i.sim(period).unwrap();
+            source_flux.extend(res.flux);
+            source_flux.extend(res.mass)
         }
+
         let mut t = 0.0;
         let mut flux: Vec<f64> = Vec::new();
         let mut storage: Vec<f64> = Vec::new();
@@ -988,8 +991,8 @@ impl Fluvial {
                     .collect::<Vec<f64>>(),
             );
             source_flux = source_flux.iter().cloned().filter(|x| x > &t).collect();
-            let roll = rng.gen_range(0.0..1.0);
-            if !storage.is_empty() && roll < self.rate {
+            // let roll = rng.gen_range(0.0..1.0);
+            if !storage.is_empty() {
                 let rm =
                     rand::distributions::Uniform::from(0..storage.len()).sample(&mut rng);
                 flux.push(storage[rm]);
