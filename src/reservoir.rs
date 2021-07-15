@@ -985,10 +985,12 @@ impl Fluvial {
             info!("Selecting from inputs present before time of removal.");
             if !storage.is_empty() {
                 for _ in 0..storage.len() {
+                    println!("Entering storage.");
                     let roll = rng.gen_range(0.0..1.0);
                     if roll < self.rate {
                         let rm =
                             rand::distributions::Uniform::from(0..storage.len()).sample(&mut rng);
+                        println!("Rate drawn is {}", rm);
                         flux.push(storage[rm]);
                         storage.remove(rm);
                     }
