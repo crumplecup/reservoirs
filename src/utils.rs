@@ -299,7 +299,9 @@ pub fn convo(x: &[f64], y: &[f64], rng: i32) -> Vec<f64> {
 
 /// Generates expected values from a Poisson distribution for a single event envelope.
 pub fn fish(rate: f64, t: f64) -> f64 {
-    (rate * t) * f64::exp(-rate * t)
+    let mut val = -rate * t;
+    val = val.exp() * rate * t;
+    val
 }
 
 /// Produce integer-like index of f64 values from generic range.
