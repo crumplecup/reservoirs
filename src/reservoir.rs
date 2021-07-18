@@ -979,6 +979,7 @@ impl Fluvial {
         for i in 0..*period as i32 {
             idx.push(i as f64);
             ps.push(utils::fish(self.flux_rate, i as f64 / self.turnover));
+            println!("Fish value is {:?}", utils::fish(self.flux_rate, i as f64 / self.turnover))
         }
         let wts = rand::distributions::WeightedIndex::new(&ps).unwrap();
 
@@ -1007,7 +1008,7 @@ impl Fluvial {
     }
 
     /// Sets length of the turnover period.
-    pub fn turnover(mut self, turnover: f64) -> Self {
+    pub fn turnover(mut self, turnover: &f64) -> Self {
         self.turnover = turnover.to_owned();
         self
     }
