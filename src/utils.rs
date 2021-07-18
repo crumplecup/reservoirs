@@ -4,6 +4,7 @@ use realfft::RealFftPlanner;
 use rustfft::num_complex::Complex;
 use serde::Serialize;
 
+
 /// Anderson-Darling Two-Sample Test
 pub fn ad_dual(sample: &[f64], other: &[f64]) -> f64 {
     // join the two vectors and sort
@@ -294,6 +295,11 @@ pub fn convo(x: &[f64], y: &[f64], rng: i32) -> Vec<f64> {
         .map(|a| a / (rng + 1) as f64)
         .collect::<Vec<f64>>();
     out_data
+}
+
+/// Generates expected values from a Poisson distribution for a single event envelope.
+pub fn fish(rate: f64, t: f64) -> f64 {
+    (rate * t) * f64::exp(-rate * t)
 }
 
 /// Produce integer-like index of f64 values from generic range.

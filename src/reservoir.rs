@@ -923,23 +923,32 @@ pub struct FluvialModel {
 /// Fluvial traversal struct for gravels and fines.
 #[derive(Clone, Debug)]
 pub struct Fluvial {
-    flux: Vec<f64>,
+    flux_rate: f64,
     mass: Vec<f64>,
     period: f64,
-    rate: f64,
     source: Vec<Reservoir>,
+    storage_rate: f64,
+    turnover: f64,
 }
 
 impl Fluvial {
     /// New fluvial struct
     pub fn new() -> Fluvial {
         Fluvial {
-            flux: Vec::new(),
+            flux_rate: 0.0,
             mass: Vec::new(),
             period: 0.0,
-            rate: 0.0,
             source: Vec::new(),
+            storage_rate: 0.0,
+            turnover: 0.0,
         }
+    }
+
+    /// Represents the probability of particles routing to the flux pool.
+    /// Particles have a (1 - flux_rate) chance of routing to the storage pool.
+    pub fn flux_rate(mut self, flux_rate: &f64) -> Self {
+        self.flux_rate = flux_rate.to_owned();
+        self
     }
 
     /// Represents the exit probability of particles from the reservoir.
@@ -948,11 +957,6 @@ impl Fluvial {
         self
     }
 
-    /// Represents the exit probability of particles from the reservoir.
-    pub fn rate(mut self, rate: &f64) -> Self {
-        self.rate = rate.to_owned();
-        self
-    }
 
     /// Prints csv of reservoir mass to file path.
     pub fn record_mass(mut self, path: &str) -> Result<(), errors::ResError> {
@@ -961,179 +965,55 @@ impl Fluvial {
     }
 
     /// Simulates removal from the reservoir over time based on the rate.
-    pub fn sim(mut self, period: &f64) -> Self {
+    pub fn sim(mut self, period: &f64) -> Result<Self, errors::ResError> {
+        pretty_env_logger::try_init()?;
         let mut source_flux = Vec::new();
-        let inherited_ages = self.source[0].inherit.clone().unwrap();
         let mut rng = self.source[0].range.clone();
         for i in self.source.clone() {
             let res = i.sim(period).unwrap();
-            source_flux.extend(res.flux);
+            source_flux.extend(res.mass);
         }
-
-        let mut t = 0.0;
-        let mut flux: Vec<f64> = Vec::new();
-        // let mut storage: Vec<f64> = Vec::new();
-
-        let _ = pretty_env_logger::try_init();
-        let mut ti = 0f64;
-        let mut gravels = Vec::new();
-        let mut trapped: Vec<f64> = Vec::new();
-        let mut gravel_bin: Vec<f64> = Vec::new();
-        let mut trap_bin: Vec<f64> = Vec::new();
-
-
-        info!("Generating inputs until time for removal.");
-        if let Some(x) = self.source[0].input {
-            while ti < *period {
-                ti += x.sample(&mut rng) as f64;
-                let roll = rng.gen_range(0.0..1.0);
-                if roll < 0.5 {
-                    gravels.push(ti);
-                } else {
-                    trapped.push(ti);
-                }
-            }
+        info!("Selection probability for storage.");
+        let mut idx = Vec::new();
+        let mut ps = Vec::new();
+        for i in 0..*period as i32 {
+            idx.push(i as f64);
+            ps.push(utils::fish(self.flux_rate, i as f64 / self.turnover));
         }
+        let wts = rand::distributions::WeightedIndex::new(&ps).unwrap();
 
-        while t < *period {
-            info!("Generating a time for removal.");
-
-            match self.source[0].output {
-                Some(x) => t += x.sample(&mut rng) as f64,
-                None => continue,
-            }
-
-            info!("Partitioning sources for removal.");
-            gravel_bin.extend(
-                gravels
-                    .iter()
-                    .cloned()
-                    .filter(|x| x <= &t)
-                    .collect::<Vec<f64>>(),
-            );
-            gravels = gravels.iter().cloned().filter(|x| x > &t).collect();
-            trap_bin.extend(
-                trapped
-                    .iter()
-                    .cloned()
-                    .filter(|x| x <= &t)
-                    .collect::<Vec<f64>>(),
-            );
-            trapped = trapped.iter().cloned().filter(|x| x > &t).collect();
+        for i in 0..source_flux.len() {
             let roll = rng.gen_range(0.0..1.0);
-            if roll < self.rate {
-                if !gravel_bin.is_empty() {
-                    let rm =
-                        rand::distributions::Uniform::from(0..gravel_bin.len()).sample(&mut rng);
-                    flux.push(gravel_bin[rm]);
-                    gravel_bin.remove(rm);
-                } else if !trap_bin.is_empty() {
-                        let rm =
-                            rand::distributions::Uniform::from(0..trap_bin.len()).sample(&mut rng);
-                        flux.push(trap_bin[rm]);
-                        trap_bin.remove(rm);
-                }
+            if roll > self.flux_rate {
+                source_flux[i] += idx[wts.sample(&mut rng)];
             }
         }
-        info!("Converting times to before present.");
-        gravel_bin = gravel_bin.par_iter().map(|x| period - x).collect();
-        trap_bin = trap_bin.par_iter().map(|x| period - x).collect();
-        info!("Adding inherited age.");
-        gravel_bin = gravel_bin
-            .iter()
-            .map(|z| {
-                z + inherited_ages
-                    [rand::distributions::Uniform::from(0..inherited_ages.len()).sample(&mut rng)]
-            })
-            .collect();
-        trap_bin = trap_bin
-            .iter()
-            .map(|z| {
-                z + inherited_ages
-                    [rand::distributions::Uniform::from(0..inherited_ages.len()).sample(&mut rng)]
-            })
-            .collect();
-        self.flux = flux;
-        gravel_bin.extend(trap_bin);
-        self.mass = gravel_bin;
-        self
+
+        self.mass = source_flux;
+        Ok(self)
     }
 
-        /*
-
-        while t < *period {
-            match self.source[0].output {
-                Some(x) => t += x.sample(&mut rng) as f64,
-                None => continue,
-            }
-            info!("Partitioning sources for removal.");
-            storage.extend(
-                source_flux
-                    .iter()
-                    .cloned()
-                    .filter(|x| x <= &t)
-                    .collect::<Vec<f64>>(),
-            );
-            source_flux = source_flux.iter().cloned().filter(|x| x > &t).collect();
-            info!("Selecting from inputs present before time of removal.");
-            if !storage.is_empty() {
-                let rm =
-                    rand::distributions::Uniform::from(0..storage.len()).sample(&mut rng);
-                flux.push(storage[rm]);
-                storage.remove(rm);
-            }
-        }
-
-        while t < *period {
-            info!("Partitioning sources for removal.");
-            storage.extend(
-                source_flux
-                    .iter()
-                    .cloned()
-                    .filter(|x| x <= &t)
-                    .collect::<Vec<f64>>(),
-            );
-            source_flux = source_flux.iter().cloned().filter(|x| x > &t).collect();
-            info!("Selecting from inputs present before time of removal.");
-            if !storage.is_empty() {
-                for _ in 0..storage.len() {
-                    let roll = rng.gen_range(0.0..1.0);
-                    if roll < self.rate {
-                        let rm =
-                            rand::distributions::Uniform::from(0..storage.len()).sample(&mut rng);
-                        flux.push(storage[rm]);
-                        storage.remove(rm);
-                    }
-                }
-            }
-            t += 1.0;
-        }
-
-
-
-        info!("Converting times to before present.");
-        storage = storage.par_iter().map(|x| period - x).collect();
-        info!("Adding inherited age.");
-        storage = storage
-            .iter()
-            .map(|z| {
-                z + inherited_ages
-                    [rand::distributions::Uniform::from(0..inherited_ages.len()).sample(&mut rng)]
-            })
-            .collect();
-        self.flux = flux;
-        self.mass = storage;
-        self
-    }
-
-         */
 
     /// Sets source reservoirs.
     pub fn source(mut self, source: &[Reservoir]) -> Self {
         self.source = source.to_owned();
         self
     }
+
+    /// Sets the rate of the Poisson distribution defining the PMF of storage time.
+    pub fn storage_rate(mut self, storage_rate: &f64) -> Self {
+        self.storage_rate = storage_rate.to_owned();
+        self
+    }
+
+    /// Sets length of the turnover period.
+    pub fn turnover(mut self, turnover: f64) -> Self {
+        self.turnover = turnover.to_owned();
+        self
+    }
 }
+
+
 
 impl Default for Fluvial {
     fn default() -> Fluvial {

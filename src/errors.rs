@@ -11,6 +11,9 @@ pub enum ResError {
     IoError,
     /// Error type from Box<dyn StdError>
     BoxError,
+    /// Error type from log::SetLoggerError
+    LogError,
+
 }
 
 impl std::error::Error for ResError {}
@@ -26,6 +29,7 @@ impl std::fmt::Display for ResError {
             ResError::FftError => write!(f, "Error with fft process."),
             ResError::IoError => write!(f, "Could not read file from path provided."),
             ResError::BoxError => write!(f, "Maybe a plot error."),
+            ResError::LogError => write!(f, "Tried to start logger.")
         }
     }
 }
@@ -57,5 +61,11 @@ impl From<std::io::Error> for ResError {
 impl From<Box<dyn serde::de::StdError>> for ResError {
     fn from(_: Box<dyn serde::de::StdError>) -> Self {
         ResError::BoxError
+    }
+}
+
+impl From<log::SetLoggerError> for ResError {
+    fn from(_: log::SetLoggerError) -> Self {
+        ResError::LogError
     }
 }
