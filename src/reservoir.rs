@@ -966,6 +966,12 @@ impl ModelManager {
         self
     }
 
+    /// Set period length of model runs.
+    pub fn period(mut self, period: f64) -> Self {
+        self.period = period;
+        self
+    }
+
     /// Set the number of runs when estimating source mass (per run of Fluvial::sim()).
     pub fn source_runs(mut self, source_runs: usize) -> Self {
         self.source_runs = source_runs;
