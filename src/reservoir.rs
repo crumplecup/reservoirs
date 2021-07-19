@@ -1061,13 +1061,13 @@ impl Fluvial {
         let mut ksas = Vec::with_capacity(self.manager.runs as usize);
 
         for seed in seeds {
-            let gof = self.clone().manager(&self.manager.clone().range(seed)).gof(other);
-            ads.push(gof[0]);
-            adas.push(gof[1]);
-            chs.push(gof[2]);
-            kps.push(gof[3]);
-            kss.push(gof[4]);
-            ksas.push(gof[5]);
+            let fit = self.clone().manager(&self.manager.clone().range(seed)).gof(other);
+            ads.push(fit[0]);
+            adas.push(fit[1]);
+            chs.push(fit[2]);
+            kps.push(fit[3]);
+            kss.push(fit[4]);
+            ksas.push(fit[5]);
         }
 
         let res = vec![
@@ -1105,6 +1105,7 @@ impl Fluvial {
         }
     }
 
+    /// Return a stereotypical mass age distribution at the current model parameters.
     pub fn stereotype_rate(self) -> Vec<f64> {
         // let bins = 1000;
         let mut rng = self.manager.range.clone();
@@ -1142,8 +1143,8 @@ impl Fluvial {
         }
         // let cdf = utils::cdf_bin(&rec, bins); // subsample vector to length bins
 
-        let gof = res.par_iter().cloned().map(|x| x.gof(&rec)).collect::<Vec<Vec<f64>>>(); // ks and kp values
-        let ks = gof.par_iter().cloned().map(|x| x[5]).collect::<Vec<f64>>(); // clip to just ks values
+        let fit = res.par_iter().cloned().map(|x| x.gof(&rec)).collect::<Vec<Vec<f64>>>(); // ks and kp values
+        let ks = fit.par_iter().cloned().map(|x| x[5]).collect::<Vec<f64>>(); // clip to just ks values
         let mut least = 1.0; // test for lowest fit (set to high value)
         let mut low = Fluvial::new(); // initialize variable to hold lowest fit
         for (i, val) in ns.iter().enumerate() {
@@ -1244,9 +1245,9 @@ impl Fluvial {
     pub fn sim(mut self) -> Self {
         let mut source_flux = Vec::new();
         let mut rng = self.source[0].range.clone();
-        for i in self.source.clone() {
-            let res = i.sim(&self.manager.period).unwrap();
-            source_flux.extend(res.mass);
+        for mut i in self.source.clone() {
+            let res = i.stereotype(100);
+            source_flux.extend(res);
         }
         info!("Selection probability for storage.");
         let mut idx = Vec::new();
@@ -1297,6 +1298,7 @@ impl Default for Fluvial {
 #[derive(Clone, Debug)]
 pub struct Reservoir {
     input: Option<Exp<f64>>,
+    model: ModelManager,
     /// Ages (in years) of deposits accumulated in reservoir.
     pub mass: Vec<f64>,
     output: Option<Exp<f64>>,
@@ -1401,6 +1403,12 @@ impl Reservoir {
         Ok(self)
     }
 
+    /// Set model parameters as fields in manager struct.
+    pub fn model(mut self, model: &ModelManager) -> Self {
+        self.model = model.to_owned();
+        self
+    }
+
     /// Create reservoirs using a builder pattern.  Calling new() creates an empty reservoir.
     /// Use the [input](#method.input) and [output](#method.output) methods to set rates, which start at None.
     /// Set inherited age similarly using the method [inherit](#method.inherit).
@@ -1416,6 +1424,7 @@ impl Reservoir {
     pub fn new() -> Self {
         Reservoir {
             input: None,
+            model: ModelManager::new(),
             mass: Vec::new(),
             output: None,
             flux: Vec::new(),
@@ -1533,6 +1542,59 @@ impl Reservoir {
         self.flux = flux;
         Ok(self)
     }
+
+    /// Return a stereotypical mass age distribution at the current model parameters.
+    pub fn stereotype(&mut self, runs: usize) -> Vec<f64> {
+        let mut res: Vec<Reservoir> = Vec::with_capacity(runs);
+        let seeder: rand::distributions::Uniform<u64> =
+            rand::distributions::Uniform::new(0, 10000000);
+        let seeds = seeder
+            .sample_iter(&mut self.model.range)
+            .take(runs)
+            .collect::<Vec<u64>>();
+
+        for seed in seeds {
+            // make boot number copies of reservoir
+            res.push(self.clone().model(&self.model.clone().range(seed)));
+        }
+        res = res
+            .iter()
+            .cloned()
+            .map(|x| x.sim(&self.model.period).unwrap())
+            .collect::<Vec<Reservoir>>(); // simulate accumulation record for each copy
+        let mut ns = res
+            .iter()
+            .cloned()
+            .map(|x| x.mass.len() as f64)
+            .collect::<Vec<f64>>(); // number of deposits in reservoir
+        let mid_n = utils::median(&ns); // median number of deposits
+        ns = ns
+            .iter()
+            .map(|x| rand_distr::num_traits::abs((x / mid_n) - 1.0))
+            .collect(); // distance from median length
+        // collect reservoir masses into single vector and calculate the cdf
+        let mut rec = Vec::new(); // vector of mass
+        for r in res.clone() {
+            rec.append(&mut r.mass.clone()); // add each run to make one long vector
+        }
+        // let cdf = utils::cdf_bin(&rec, bins); // subsample vector to length bins
+
+        let gof = res.iter().cloned().map(|x| x.gof(&rec)).collect::<Vec<Fit>>(); // ks and kp values
+        let ks = gof.iter().cloned().map(|x| x.ks).collect::<Vec<f64>>(); // clip to just ks values
+        let mut least = 1.0; // test for lowest fit (set to high value)
+        let mut low = Reservoir::new(); // initialize variable to hold lowest fit
+        for (i, val) in ns.iter().enumerate() {
+            let loss = ks[i] + val; // loss function
+            if loss < least {
+                // if lowest value
+                low = res[i].clone(); // copy to low
+                least = loss; // set least to new low value
+            }
+        }
+
+        low.mass
+    }
+
 }
 
 impl Default for Reservoir {
