@@ -59,7 +59,6 @@
 *
 * // create reservoir model using builder pattern
 * let mut model = Model::new(debris_flows)
-*     .period(&period)
 *     .runs(runs);
 *
 * // sample a stereotypical record from 1000 runs of 30000 years
