@@ -1121,7 +1121,7 @@ impl Fluvial {
             res.push(self.clone().manager(&self.manager.clone().range(seed)));
         }
         res = res
-            .iter()
+            .par_iter()
             .cloned()
             .map(|x| x.sim())
             .collect::<Vec<Fluvial>>(); // simulate accumulation record for each copy
@@ -1142,8 +1142,8 @@ impl Fluvial {
         }
         // let cdf = utils::cdf_bin(&rec, bins); // subsample vector to length bins
 
-        let gof = res.iter().cloned().map(|x| x.gof(&rec)).collect::<Vec<Vec<f64>>>(); // ks and kp values
-        let ks = gof.iter().cloned().map(|x| x[5]).collect::<Vec<f64>>(); // clip to just ks values
+        let gof = res.par_iter().cloned().map(|x| x.gof(&rec)).collect::<Vec<Vec<f64>>>(); // ks and kp values
+        let ks = gof.par_iter().cloned().map(|x| x[5]).collect::<Vec<f64>>(); // clip to just ks values
         let mut least = 1.0; // test for lowest fit (set to high value)
         let mut low = Fluvial::new(); // initialize variable to hold lowest fit
         for (i, val) in ns.iter().enumerate() {
