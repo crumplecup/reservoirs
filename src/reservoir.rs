@@ -939,10 +939,19 @@ impl ModelManager {
             storage_range: 0.0..1.0,
         }
     }
+
+    /// Set model seed.
     pub fn range(mut self, seed: u64) -> Self {
         self.range = rand::SeedableRng::seed_from_u64(seed);
         self
     }
+
+    /// Set number of model runs.
+    pub fn runs(mut self, runs: usize) -> Self {
+        self.runs = runs;
+        self
+    }
+
 }
 
 impl Default for ModelManager {
