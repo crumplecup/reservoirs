@@ -1082,12 +1082,12 @@ impl Fluvial {
     }
 
     /// Fits a given flux probability and storage rate to an empiric record.
-    pub fn fit_rate(self, other: &[f64]) -> FluvialFit {
-        let mut rng = self.manager.range.clone();
+    pub fn fit_rate(mut self, other: &[f64]) -> FluvialFit {
+        // let mut rng = self.manager.range.clone();
         let flux_range = rand::distributions::Uniform::from(self.manager.flux_range.clone());
-        let flux_rate = flux_range.sample(&mut rng);
+        let flux_rate = flux_range.sample(&mut self.manager.range);
         let storage_range = rand::distributions::Uniform::from(self.manager.storage_range.clone());
-        let storage_rate = storage_range.sample(&mut rng);
+        let storage_rate = storage_range.sample(&mut self.manager.range);
 
         let fit = self
             .flux_rate(&flux_rate)
@@ -1159,26 +1159,22 @@ impl Fluvial {
     }
 
     /// Fit a range of flux probabilities and storage rates to an empiric record.
-    pub fn fit_rates(self, other: &[f64]) -> Vec<FluvialFit> {
-        let mut rng = self.manager.range.clone();
+    pub fn fit_rates(mut self, other: &[f64]) -> Vec<FluvialFit> {
+        // let mut rng = self.manager.range.clone();
         let seeder: rand::distributions::Uniform<u64> =
             rand::distributions::Uniform::new(0, 10000000);
-        let seeds = seeder
-            .sample_iter(&mut rng)
-            .take(self.manager.batch)
-            .collect::<Vec<u64>>();
         let mut res = Vec::new();
-        for seed in seeds {
+        for _ in 0..self.manager.batch {
             let mut fit = self.clone();
-            fit.manager = fit.manager.range(seed).clone();
+            fit.manager = fit.manager.range(seeder.sample(&mut self.manager.range)).clone();
             res.push(fit.fit_rate(&other));
         }
         res
     }
 
     /// Run fit_rates() for a set duration.
-    pub fn fit_rates_timed(self, other: &[f64], path: &str) -> Result<Vec<FluvialFit>, errors::ResError> {
-        let mut rng = self.manager.range.clone();
+    pub fn fit_rates_timed(mut self, other: &[f64], path: &str) -> Result<Vec<FluvialFit>, errors::ResError> {
+        // let mut rng = self.manager.range.clone();
         let seeder: rand::distributions::Uniform<u64> =
             rand::distributions::Uniform::new(0, 10000000);
 
@@ -1195,8 +1191,8 @@ impl Fluvial {
         }
         while std::time::SystemTime::now() < now + dur {
             let mut fit = self.clone();
-            fit.manager = fit.manager.range(seeder.sample(&mut rng)).clone();
-            let mut new = fit.fit_rates(&other);
+            fit.manager = fit.manager.range(seeder.sample(&mut self.manager.range)).clone();
+            let mut new = fit.fit_rates(other);
             {
                 rec.append(&mut new);
             }
