@@ -1061,8 +1061,7 @@ impl Fluvial {
         let mut ksas = Vec::with_capacity(self.manager.runs as usize);
 
         for seed in seeds {
-            let obs = self.clone().manager(&self.manager.clone().range(seed)).sim().mass;
-            let gof = utils::gof(&obs, other);
+            let gof = self.clone().manager(&self.manager.clone().range(seed)).gof(other)?;
             ads.push(gof[0]);
             adas.push(gof[1]);
             chs.push(gof[2]);
