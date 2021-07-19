@@ -917,7 +917,7 @@ impl Default for Model {
 #[derive(Clone, Debug)]
 pub struct ModelManager {
     batch: usize,
-    duration: usize,
+    duration: u64,
     flux_range: std::ops::Range<f64>,
     period: f64,
     range: rand::rngs::StdRng,
@@ -952,7 +952,7 @@ impl Default for ModelManager {
 }
 
 /// Struct for model run statistics.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct FluvialFit {
     flux_rate: f64,
     storage_rate: f64,
@@ -962,6 +962,31 @@ pub struct FluvialFit {
     kp: f64,
     ks1: f64,
     ks2: f64,
+}
+
+impl FluvialFit {
+    /// Convert csv record to Gof struct.
+    pub fn read(path: &str) -> Result<Vec<FluvialFit>, errors::ResError> {
+        let mut fit = Vec::new();
+        let var = std::fs::File::open(path)?;
+        let mut rdr = csv::Reader::from_reader(var);
+        for result in rdr.records() {
+            let row = result?;
+            let row: FluvialFit = row.deserialize(None)?;
+            fit.push(row);
+        }
+        Ok(fit)
+    }
+
+    /// Write statistical results to csv file.
+    pub fn record(rec: &mut Vec<FluvialFit>, title: &str) -> Result<(), errors::ResError> {
+        let mut wtr = csv::Writer::from_path(title)?;
+        for i in rec {
+            wtr.serialize(i)?;
+        }
+        wtr.flush()?;
+        Ok(())
+    }
 }
 
 /// Fluvial traversal struct for gravels and fines.
@@ -991,7 +1016,7 @@ impl Fluvial {
     }
 
     /// Fit number of runs to gof tests and return mean of each.
-    pub fn fit(self, other: &[f64]) -> Result<Vec<f64>, errors::ResError> {
+    pub fn fit(self, other: &[f64]) -> Vec<f64> {
         let mut ads = Vec::with_capacity(self.manager.runs as usize);
         let mut adas = Vec::with_capacity(self.manager.runs as usize);
         let mut chs = Vec::with_capacity(self.manager.runs as usize);
@@ -1017,11 +1042,11 @@ impl Fluvial {
             utils::mean(&kss),
             utils::mean(&ksas),
         ];
-        Ok(res)
+        res
     }
 
     /// Fits a given flux probability and storage rate to an empiric record.
-    pub fn fit_rate(self, other: &[f64]) -> Result<FluvialFit, errors::ResError> {
+    pub fn fit_rate(self, other: &[f64]) -> FluvialFit {
         let mut rng = self.manager.range.clone();
         let flux_range = rand::distributions::Uniform::from(self.manager.flux_range.clone());
         let flux_rate = flux_range.sample(&mut rng);
@@ -1031,8 +1056,8 @@ impl Fluvial {
         let fit = self
             .flux_rate(&flux_rate)
             .storage_rate(&storage_rate)
-            .fit(other)?;
-        Ok(FluvialFit {
+            .fit(other);
+        FluvialFit {
             flux_rate,
             storage_rate,
             ad1: fit[0],
@@ -1041,7 +1066,48 @@ impl Fluvial {
             kp: fit[3],
             ks1: fit[4],
             ks2: fit[5],
-        })
+        }
+    }
+
+    /// Fit a range of flux probabilities and storage rates to an empiric record.
+    pub fn fit_rates(self, other: &[f64]) -> Vec<FluvialFit> {
+        let mut rng = self.manager.range.clone();
+        let seeder: rand::distributions::Uniform<u64> =
+            rand::distributions::Uniform::new(0, 10000000);
+        let seeds = seeder
+            .sample_iter(&mut rng)
+            .take(self.manager.runs)
+            .collect::<Vec<u64>>();
+        let mut res = Vec::new();
+        for seed in seeds {
+            let mut fit = self.clone();
+            fit.manager = fit.manager.range(seed).clone();
+            res.push(fit.fit_rate(&other));
+        }
+        res
+    }
+
+    /// Run fit_rates() for a set duration.
+    pub fn fit_rates_timed(self, other: &[f64], path: &str) -> Result<Vec<FluvialFit>, errors::ResError> {
+        let dur = std::time::Duration::new(60 * 60 * self.manager.duration, 0);
+        let now = std::time::SystemTime::now();
+        let mut rec = Vec::new();
+        let exists = std::path::Path::new(path).exists();
+        match exists {
+            true => {
+                let mut stats: Vec<FluvialFit> = FluvialFit::read(path)?;
+                rec.append(&mut stats);
+            }
+            false => {}
+        }
+        while std::time::SystemTime::now() < now + dur {
+            let mut new = self.clone().fit_rates(other);
+            {
+                rec.append(&mut new);
+            }
+            FluvialFit::record(&mut rec, path)?;
+        }
+        Ok(rec)
     }
 
     /// Represents the probability of particles routing to the flux pool.
