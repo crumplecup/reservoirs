@@ -1069,6 +1069,59 @@ impl Fluvial {
         }
     }
 
+    pub fn stereotype_rate(self) -> Vec<f64> {
+        // let bins = 1000;
+        let mut rng = self.manager.range.clone();
+        let mut res: Vec<Fluvial> = Vec::with_capacity(self.manager.runs);
+        let seeder: rand::distributions::Uniform<u64> =
+            rand::distributions::Uniform::new(0, 10000000);
+        let seeds: Vec<u64> = seeder
+            .sample_iter(&mut rng)
+            .take(self.manager.runs)
+            .collect();
+
+        for seed in seeds {
+            // make boot number copies of reservoir
+            res.push(self.clone().manager(&self.manager.clone().range(seed)));
+        }
+        res = res
+            .iter()
+            .cloned()
+            .map(|x| x.sim())
+            .collect::<Vec<Fluvial>>(); // simulate accumulation record for each copy
+        let mut ns = res
+            .iter()
+            .cloned()
+            .map(|x| x.mass.len() as f64)
+            .collect::<Vec<f64>>(); // number of deposits in reservoir
+        let mid_n = utils::median(&ns); // median number of deposits
+        ns = ns
+            .iter()
+            .map(|x| rand_distr::num_traits::abs((x / mid_n) - 1.0))
+            .collect::<Vec<f64>>(); // distance from median length
+        // collect reservoir masses into single vector and calculate the cdf
+        let mut rec = Vec::new(); // vector of mass
+        for r in res.clone() {
+            rec.append(&mut r.mass.clone()); // add each run to make one long vector
+        }
+        // let cdf = utils::cdf_bin(&rec, bins); // subsample vector to length bins
+
+        let gof = res.iter().cloned().map(|x| x.fit_rate(&rec)).collect::<Vec<FluvialFit>>(); // ks and kp values
+        let ks = gof.iter().cloned().map(|x| x.ks1).collect::<Vec<f64>>(); // clip to just ks values
+        let mut least = 1.0; // test for lowest fit (set to high value)
+        let mut low = Fluvial::new(); // initialize variable to hold lowest fit
+        for (i, val) in ns.iter().enumerate() {
+            let loss = ks[i] + val; // loss function
+            if loss < least {
+                // if lowest value
+                low = res[i].clone(); // copy to low
+                least = loss; // set least to new low value
+            }
+        }
+
+        low.mass
+    }
+
     /// Fit a range of flux probabilities and storage rates to an empiric record.
     pub fn fit_rates(self, other: &[f64]) -> Vec<FluvialFit> {
         let mut rng = self.manager.range.clone();
@@ -1089,6 +1142,10 @@ impl Fluvial {
 
     /// Run fit_rates() for a set duration.
     pub fn fit_rates_timed(self, other: &[f64], path: &str) -> Result<Vec<FluvialFit>, errors::ResError> {
+        let mut rng = self.manager.range.clone();
+        let seeder: rand::distributions::Uniform<u64> =
+            rand::distributions::Uniform::new(0, 10000000);
+
         let dur = std::time::Duration::new(60 * 60 * self.manager.duration, 0);
         let now = std::time::SystemTime::now();
         let mut rec = Vec::new();
@@ -1101,7 +1158,9 @@ impl Fluvial {
             false => {}
         }
         while std::time::SystemTime::now() < now + dur {
-            let mut new = self.clone().fit_rates(other);
+            let mut fit = self.clone();
+            fit.manager = fit.manager.range(seeder.sample(&mut rng)).clone();
+            let mut new = fit.fit_rates(&other);
             {
                 rec.append(&mut new);
             }
