@@ -1061,7 +1061,7 @@ impl Fluvial {
         let mut ksas = Vec::with_capacity(self.manager.runs as usize);
 
         for seed in seeds {
-            let gof = self.clone().manager(&self.manager.clone().range(seed)).gof(other)?;
+            let gof = self.clone().manager(&self.manager.clone().range(seed)).gof(other);
             ads.push(gof[0]);
             adas.push(gof[1]);
             chs.push(gof[2]);
@@ -1213,9 +1213,8 @@ impl Fluvial {
     }
 
     /// Goodness-of-fit test suite.
-    pub fn gof(self, other: &[f64]) -> Result<Vec<f64>, errors::ResError> {
-        let res = utils::gof(&self.sim().mass, other);
-        Ok(res)
+    pub fn gof(self, other: &[f64]) -> Vec<f64> {
+        utils::gof(&self.sim().mass, other)
     }
 
     /// Assign ModelManager to Fluvial struct
