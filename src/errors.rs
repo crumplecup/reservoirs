@@ -13,7 +13,6 @@ pub enum ResError {
     BoxError,
     /// Error type from log::SetLoggerError
     LogError,
-
 }
 
 impl std::error::Error for ResError {}
@@ -29,7 +28,7 @@ impl std::fmt::Display for ResError {
             ResError::FftError => write!(f, "Error with fft process."),
             ResError::IoError => write!(f, "Could not read file from path provided."),
             ResError::BoxError => write!(f, "Maybe a plot error."),
-            ResError::LogError => write!(f, "Tried to start logger.")
+            ResError::LogError => write!(f, "Tried to start logger."),
         }
     }
 }

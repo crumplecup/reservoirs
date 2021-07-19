@@ -913,17 +913,62 @@ impl Default for Model {
     }
 }
 
-/// Model framework for fluvial traversal
+/// Model manager struct for control flow of modeling operations.
 #[derive(Clone, Debug)]
-pub struct FluvialModel {
-    res: Fluvial,
+pub struct ModelManager {
+    batch: usize,
+    duration: usize,
+    flux_range: std::ops::Range<f64>,
     period: f64,
+    range: rand::rngs::StdRng,
+    runs: usize,
+    storage_range: std::ops::Range<f64>,
+}
+
+/// Methods for modeling.
+impl ModelManager {
+    /// Reference a FluvialModel type to create a new ModelManager instance.
+    pub fn new() -> ModelManager {
+        ModelManager {
+            batch: 1,
+            duration: 1,
+            flux_range: 0.0..1.0,
+            period: 100.0,
+            range: rand::SeedableRng::seed_from_u64(777),
+            runs: 10,
+            storage_range: 0.0..1.0,
+        }
+    }
+    pub fn range(mut self, seed: u64) -> Self {
+        self.range = rand::SeedableRng::seed_from_u64(seed);
+        self
+    }
+}
+
+impl Default for ModelManager {
+    fn default() -> ModelManager {
+        ModelManager::new()
+    }
+}
+
+/// Struct for model run statistics.
+#[derive(Clone, Debug, Serialize)]
+pub struct FluvialFit {
+    flux_rate: f64,
+    storage_rate: f64,
+    ad1: f64,
+    ad2: f64,
+    ch: f64,
+    kp: f64,
+    ks1: f64,
+    ks2: f64,
 }
 
 /// Fluvial traversal struct for gravels and fines.
 #[derive(Clone, Debug)]
 pub struct Fluvial {
     flux_rate: f64,
+    manager: ModelManager,
     mass: Vec<f64>,
     period: f64,
     source: Vec<Reservoir>,
@@ -936,12 +981,67 @@ impl Fluvial {
     pub fn new() -> Fluvial {
         Fluvial {
             flux_rate: 0.0,
+            manager: ModelManager::new(),
             mass: Vec::new(),
             period: 0.0,
             source: Vec::new(),
             storage_rate: 0.0,
             turnover: 0.0,
         }
+    }
+
+    /// Fit number of runs to gof tests and return mean of each.
+    pub fn fit(self, other: &[f64]) -> Result<Vec<f64>, errors::ResError> {
+        let mut ads = Vec::with_capacity(self.manager.runs as usize);
+        let mut adas = Vec::with_capacity(self.manager.runs as usize);
+        let mut chs = Vec::with_capacity(self.manager.runs as usize);
+        let mut kps = Vec::with_capacity(self.manager.runs as usize);
+        let mut kss = Vec::with_capacity(self.manager.runs as usize);
+        let mut ksas = Vec::with_capacity(self.manager.runs as usize);
+
+        for _ in 0..self.manager.runs {
+            let obs = self.clone().sim()?.mass;
+            let gof = utils::gof(&obs, other);
+            ads.push(gof[0]);
+            adas.push(gof[1]);
+            chs.push(gof[2]);
+            kps.push(gof[3]);
+            kss.push(gof[4]);
+            ksas.push(gof[5]);
+        }
+        let res = vec![
+            utils::mean(&ads),
+            utils::mean(&adas),
+            utils::mean(&chs),
+            utils::mean(&kps),
+            utils::mean(&kss),
+            utils::mean(&ksas),
+        ];
+        Ok(res)
+    }
+
+    /// Fits a given flux probability and storage rate to an empiric record.
+    pub fn fit_rate(self, other: &[f64]) -> Result<FluvialFit, errors::ResError> {
+        let mut rng = self.manager.range.clone();
+        let flux_range = rand::distributions::Uniform::from(self.manager.flux_range.clone());
+        let flux_rate = flux_range.sample(&mut rng);
+        let storage_range = rand::distributions::Uniform::from(self.manager.storage_range.clone());
+        let storage_rate = storage_range.sample(&mut rng);
+
+        let fit = self
+            .flux_rate(&flux_rate)
+            .storage_rate(&storage_rate)
+            .fit(other)?;
+        Ok(FluvialFit {
+            flux_rate,
+            storage_rate,
+            ad1: fit[0],
+            ad2: fit[1],
+            ch: fit[2],
+            kp: fit[3],
+            ks1: fit[4],
+            ks2: fit[5],
+        })
     }
 
     /// Represents the probability of particles routing to the flux pool.
@@ -951,12 +1051,33 @@ impl Fluvial {
         self
     }
 
+    /// Goodness-of-fit test suite.
+    pub fn gof(self, other: &[f64]) -> Result<Vec<f64>, errors::ResError> {
+        let obs = self.sim()?.mass;
+        let res = utils::gof(&obs, other);
+        Ok(res)
+    }
+
+    /// Assign ModelManager to Fluvial struct
+    pub fn manager(mut self, manager: &ModelManager) -> Self {
+        self.manager = manager.to_owned();
+        self
+    }
+
+    /// Runs sim() a number of times specified by ModelManager struct.
+    pub fn n_sim(self) -> Result<Vec<Vec<f64>>, errors::ResError> {
+        let mut res = Vec::new();
+        for _ in 0..self.manager.runs {
+            res.push(self.clone().sim()?.mass);
+        }
+        Ok(res)
+    }
+
     /// Represents the exit probability of particles from the reservoir.
     pub fn period(mut self, period: &f64) -> Self {
         self.period = period.to_owned();
         self
     }
-
 
     /// Prints csv of reservoir mass to file path.
     pub fn record_mass(mut self, path: &str) -> Result<(), errors::ResError> {
@@ -965,21 +1086,20 @@ impl Fluvial {
     }
 
     /// Simulates removal from the reservoir over time based on the rate.
-    pub fn sim(mut self, period: &f64) -> Result<Self, errors::ResError> {
+    pub fn sim(mut self) -> Result<Self, errors::ResError> {
         pretty_env_logger::try_init()?;
         let mut source_flux = Vec::new();
         let mut rng = self.source[0].range.clone();
         for i in self.source.clone() {
-            let res = i.sim(period).unwrap();
+            let res = i.sim(&self.manager.period).unwrap();
             source_flux.extend(res.mass);
         }
         info!("Selection probability for storage.");
         let mut idx = Vec::new();
         let mut ps = Vec::new();
-        for i in 0..*period as i32 {
+        for i in 0..self.manager.period as i32 {
             idx.push(i as f64);
             ps.push(utils::fish(self.flux_rate, i as f64 / self.turnover));
-            println!("Fish value is {:?}", utils::fish(self.flux_rate, i as f64 / self.turnover))
         }
         let wts = rand::distributions::WeightedIndex::new(&ps).unwrap();
 
@@ -993,7 +1113,6 @@ impl Fluvial {
         self.mass = source_flux;
         Ok(self)
     }
-
 
     /// Sets source reservoirs.
     pub fn source(mut self, source: &[Reservoir]) -> Self {
@@ -1013,8 +1132,6 @@ impl Fluvial {
         self
     }
 }
-
-
 
 impl Default for Fluvial {
     fn default() -> Fluvial {

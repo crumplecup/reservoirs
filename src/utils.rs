@@ -4,7 +4,6 @@ use realfft::RealFftPlanner;
 use rustfft::num_complex::Complex;
 use serde::Serialize;
 
-
 /// Anderson-Darling Two-Sample Test
 pub fn ad_dual(sample: &[f64], other: &[f64]) -> f64 {
     // join the two vectors and sort
@@ -302,6 +301,34 @@ pub fn fish(rate: f64, t: f64) -> f64 {
     let mut val = -rate * t;
     val = val.exp() * rate * t;
     val
+}
+
+/// Goodness of fit test suite.
+pub fn gof(obs: &[f64], other: &[f64]) -> Vec<f64> {
+    let cdf = cdf_dual(obs, other);
+    let ad = ad_dual(obs, other);
+    // anderson-darling test
+    let lnx = obs.len();
+    let lny = other.len();
+    let k = lnx + lny;
+    let ada = (2.492 - 1.0) * (1.0 - (1.55 / k as f64)) + 1.0;
+    // chi-squared pearsons test
+    let ch = cdf
+        .iter()
+        .filter(|x| x.0 > 0.0)
+        .map(|x| f64::powi(x.1 - x.0, 2) / x.0)
+        .sum::<f64>();
+    // kuiper test
+    let kp1 = cdf.iter().map(|x| x.0 - x.1).fold(0.0, f64::max);
+    let kp2 = cdf.iter().map(|x| x.1 - x.0).fold(0.0, f64::max);
+    let kp = kp1 + kp2;
+    // kolmogorov-smirnov test
+    let ks = cdf
+        .iter()
+        .map(|x| rand_distr::num_traits::abs(x.0 - x.1))
+        .fold(0.0, f64::max);
+    let ksa = 1.35810 * f64::sqrt(k as f64 / (lnx * lny) as f64); // k-s crit value at 0.05
+    vec![ad, ada, ch, kp, ks, ksa]
 }
 
 /// Produce integer-like index of f64 values from generic range.
