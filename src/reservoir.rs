@@ -395,7 +395,7 @@ impl Model {
         res = res
             .par_iter()
             .cloned()
-            .map(|x| x.sim(&self.period).unwrap())
+            .map(|x| x.sim())
             .collect();
         let fits: Vec<Fit> = res.par_iter().cloned().map(|x| x.gof(other)).collect();
         let ads: Vec<f64> = fits.iter().map(|x| x.ad).collect();
@@ -783,7 +783,7 @@ impl Model {
         let res: Vec<Reservoir> = res
             .par_iter()
             .cloned()
-            .map(|x| x.reservoir.sim(&self.period).unwrap())
+            .map(|x| x.reservoir.sim())
             .collect(); // simulate accumulation record for each copy
         let mut ns: Vec<f64> = res
             .par_iter()
@@ -858,7 +858,7 @@ impl Model {
         res = res
             .par_iter()
             .cloned()
-            .map(|x| x.sim(&self.period).unwrap())
+            .map(|x| x.sim())
             .collect();
 
         let index = 0..self.range;
@@ -1030,7 +1030,6 @@ pub struct Fluvial {
     flux_rate: f64,
     manager: ModelManager,
     mass: Vec<f64>,
-    period: f64,
     source: Vec<Reservoir>,
     storage_rate: f64,
     turnover: f64,
@@ -1043,7 +1042,6 @@ impl Fluvial {
             flux_rate: 0.0,
             manager: ModelManager::new(),
             mass: Vec::new(),
-            period: 0.0,
             source: Vec::new(),
             storage_rate: 0.0,
             turnover: 0.0,
@@ -1237,11 +1235,6 @@ impl Fluvial {
         Ok(res)
     }
 
-    /// Represents the exit probability of particles from the reservoir.
-    pub fn period(mut self, period: &f64) -> Self {
-        self.period = period.to_owned();
-        self
-    }
 
     /// Prints csv of reservoir mass to file path.
     pub fn record_mass(mut self, path: &str) -> Result<(), errors::ResError> {
@@ -1330,7 +1323,7 @@ impl Reservoir {
     ///     let mut debris_flows = Reservoir::new()
     ///         .input(&0.78)?
     ///         .output(&0.78)?
-    ///         .sim(&4000.0)?;
+    ///         .sim();
     ///     let fit = debris_flows.gof(&ages);
     ///     println!("Fit is {:?}.", fit);
     ///     Ok(())
@@ -1494,19 +1487,19 @@ impl Reservoir {
     ///     let mut gravels = Reservoir::new().input(&0.54)?.output(&0.54)?;
     ///
     ///     // simulate accumulation for 30000 years
-    ///     fines = fines.sim(&30000.0)?;
-    ///     gravels = gravels.sim(&30000.0)?;
+    ///     fines = fines.sim();
+    ///     gravels = gravels.sim();
     ///     Ok(())
     /// }
     /// ```
-    pub fn sim(mut self, period: &f64) -> Result<Self, errors::ResError> {
-        let _ = pretty_env_logger::try_init();
+    pub fn sim(mut self) -> Self {
+        // let _ = pretty_env_logger::try_init();
         let mut om = 0f64;
         let mut im = 0f64;
         let mut flux = Vec::new();
         let mut mass = Vec::new(); // time of arrivals in reservoir
 
-        while om < *period {
+        while om < self.model.period {
             info!("Generating a time for removal.");
             match self.output {
                 Some(x) => om += x.sample(&mut self.range) as f64,
@@ -1535,7 +1528,7 @@ impl Reservoir {
             }
         }
 
-        mass = mass.par_iter().map(|x| period - x).collect();
+        mass = mass.iter().map(|x| self.model.period - x).collect();
         // flux = flux.par_iter().map(|x| period - x).collect();
         if let Some(x) = self.inherit.clone() {
             let ln = x.len();
@@ -1548,7 +1541,7 @@ impl Reservoir {
 
         self.mass = mass;
         self.flux = flux;
-        Ok(self)
+        self
     }
 
     /// Return a stereotypical mass age distribution at the current model parameters.
@@ -1568,7 +1561,7 @@ impl Reservoir {
         res = res
             .iter()
             .cloned()
-            .map(|x| x.sim(&self.model.period).unwrap())
+            .map(|x| x.sim())
             .collect::<Vec<Reservoir>>(); // simulate accumulation record for each copy
         let mut ns = res
             .iter()
