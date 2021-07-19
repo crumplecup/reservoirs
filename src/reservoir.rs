@@ -1215,7 +1215,7 @@ impl Fluvial {
 
     /// Goodness-of-fit test suite.
     pub fn gof(self, other: &[f64]) -> Result<Vec<f64>, errors::ResError> {
-        let res = utils::gof(&self.mass, other);
+        let res = utils::gof(&self.sim().mass, other);
         Ok(res)
     }
 
