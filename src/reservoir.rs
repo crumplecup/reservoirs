@@ -1121,18 +1121,18 @@ impl Fluvial {
             res.push(self.clone().manager(&self.manager.clone().range(seed)));
         }
         res = res
-            .iter()
+            .par_iter()
             .cloned()
             .map(|x| x.sim())
             .collect::<Vec<Fluvial>>(); // simulate accumulation record for each copy
         let mut ns = res
-            .iter()
+            .par_iter()
             .cloned()
             .map(|x| x.mass.len() as f64)
             .collect::<Vec<f64>>(); // number of deposits in reservoir
         let mid_n = utils::median(&ns); // median number of deposits
         ns = ns
-            .iter()
+            .par_iter()
             .map(|x| rand_distr::num_traits::abs((x / mid_n) - 1.0))
             .collect::<Vec<f64>>(); // distance from median length
         // collect reservoir masses into single vector and calculate the cdf
@@ -1142,8 +1142,8 @@ impl Fluvial {
         }
         // let cdf = utils::cdf_bin(&rec, bins); // subsample vector to length bins
 
-        let gof = res.iter().cloned().map(|x| x.fit_rate(&rec)).collect::<Vec<FluvialFit>>(); // ks and kp values
-        let ks = gof.iter().cloned().map(|x| x.ks1).collect::<Vec<f64>>(); // clip to just ks values
+        let gof = res.par_iter().cloned().map(|x| x.fit_rate(&rec)).collect::<Vec<FluvialFit>>(); // ks and kp values
+        let ks = gof.par_iter().cloned().map(|x| x.ks1).collect::<Vec<f64>>(); // clip to just ks values
         let mut least = 1.0; // test for lowest fit (set to high value)
         let mut low = Fluvial::new(); // initialize variable to hold lowest fit
         for (i, val) in ns.iter().enumerate() {
