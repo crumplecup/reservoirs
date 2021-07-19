@@ -1251,7 +1251,7 @@ impl Fluvial {
     /// Simulates removal from the reservoir over time based on the rate.
     pub fn sim(mut self) -> Self {
         let mut source_flux = Vec::new();
-        let mut rng = self.source[0].range.clone();
+        // let mut rng = self.source[0].range.clone();
         for mut i in self.source.clone() {
             let res = i.stereotype();
             source_flux.extend(res);
@@ -1266,9 +1266,9 @@ impl Fluvial {
         let wts = rand::distributions::WeightedIndex::new(&ps).unwrap();
 
         for i in 0..source_flux.len() {
-            let roll = rng.gen_range(0.0..1.0);
+            let roll = self.manager.range.gen_range(0.0..1.0);
             if roll > self.flux_rate {
-                source_flux[i] += idx[wts.sample(&mut rng)];
+                source_flux[i] += idx[wts.sample(&mut self.manager.range)];
             }
         }
 
