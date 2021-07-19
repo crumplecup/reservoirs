@@ -948,7 +948,7 @@ impl ModelManager {
 
     /// Set the range flux rates.
     pub fn flux_range(mut self, flux_range: std::ops::Range<f64>) -> Self {
-        self.flux_range = flux_range.to_owned();
+        self.flux_range = flux_range;
         self
     }
 
@@ -966,7 +966,7 @@ impl ModelManager {
 
     /// Set the range of storage rates.
     pub fn storage_range(mut self, storage_range: std::ops::Range<f64>) -> Self {
-        self.storage_range = storage_range.to_owned();
+        self.storage_range = storage_range;
         self
     }
 
@@ -1156,7 +1156,7 @@ impl Fluvial {
             rand::distributions::Uniform::new(0, 10000000);
         let seeds = seeder
             .sample_iter(&mut rng)
-            .take(self.manager.runs)
+            .take(self.manager.batch)
             .collect::<Vec<u64>>();
         let mut res = Vec::new();
         for seed in seeds {
