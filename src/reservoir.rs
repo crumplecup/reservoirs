@@ -947,7 +947,7 @@ impl ModelManager {
     }
 
     /// Set the range flux rates.
-    pub fn flux_range(mut self, flux_range: &std::ops::Range<f64>) -> Self {
+    pub fn flux_range(mut self, flux_range: std::ops::Range<f64>) -> Self {
         self.flux_range = flux_range.to_owned();
         self
     }
@@ -965,7 +965,7 @@ impl ModelManager {
     }
 
     /// Set the range of storage rates.
-    pub fn storage_range(mut self, storage_range: &std::ops::Range<f64>) -> Self {
+    pub fn storage_range(mut self, storage_range: std::ops::Range<f64>) -> Self {
         self.storage_range = storage_range.to_owned();
         self
     }
