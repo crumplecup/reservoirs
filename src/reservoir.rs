@@ -1000,7 +1000,7 @@ impl Fluvial {
         let mut ksas = Vec::with_capacity(self.manager.runs as usize);
 
         for _ in 0..self.manager.runs {
-            let obs = self.clone().sim()?.mass;
+            let obs = self.clone().sim().mass;
             let gof = utils::gof(&obs, other);
             ads.push(gof[0]);
             adas.push(gof[1]);
@@ -1053,7 +1053,7 @@ impl Fluvial {
 
     /// Goodness-of-fit test suite.
     pub fn gof(self, other: &[f64]) -> Result<Vec<f64>, errors::ResError> {
-        let obs = self.sim()?.mass;
+        let obs = self.sim().mass;
         let res = utils::gof(&obs, other);
         Ok(res)
     }
@@ -1068,7 +1068,7 @@ impl Fluvial {
     pub fn n_sim(self) -> Result<Vec<Vec<f64>>, errors::ResError> {
         let mut res = Vec::new();
         for _ in 0..self.manager.runs {
-            res.push(self.clone().sim()?.mass);
+            res.push(self.clone().sim().mass);
         }
         Ok(res)
     }
@@ -1086,8 +1086,7 @@ impl Fluvial {
     }
 
     /// Simulates removal from the reservoir over time based on the rate.
-    pub fn sim(mut self) -> Result<Self, errors::ResError> {
-        pretty_env_logger::try_init()?;
+    pub fn sim(mut self) -> Self {
         let mut source_flux = Vec::new();
         let mut rng = self.source[0].range.clone();
         for i in self.source.clone() {
@@ -1111,7 +1110,7 @@ impl Fluvial {
         }
 
         self.mass = source_flux;
-        Ok(self)
+        self
     }
 
     /// Sets source reservoirs.
