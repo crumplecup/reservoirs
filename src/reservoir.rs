@@ -922,6 +922,7 @@ pub struct ModelManager {
     period: f64,
     range: rand::rngs::StdRng,
     runs: usize,
+    source_runs: usize,
     storage_range: std::ops::Range<f64>,
 }
 
@@ -936,6 +937,7 @@ impl ModelManager {
             period: 100.0,
             range: rand::SeedableRng::seed_from_u64(777),
             runs: 10,
+            source_runs: 10,
             storage_range: 0.0..1.0,
         }
     }
@@ -961,6 +963,12 @@ impl ModelManager {
     /// Set number of model runs.
     pub fn runs(mut self, runs: usize) -> Self {
         self.runs = runs;
+        self
+    }
+
+    /// Set the number of runs when estimating source mass (per run of Fluvial::sim()).
+    pub fn source_runs(mut self, source_runs: usize) -> Self {
+        self.source_runs = source_runs;
         self
     }
 
@@ -1246,7 +1254,7 @@ impl Fluvial {
         let mut source_flux = Vec::new();
         let mut rng = self.source[0].range.clone();
         for mut i in self.source.clone() {
-            let res = i.stereotype(100);
+            let res = i.stereotype();
             source_flux.extend(res);
         }
         info!("Selection probability for storage.");
@@ -1544,13 +1552,13 @@ impl Reservoir {
     }
 
     /// Return a stereotypical mass age distribution at the current model parameters.
-    pub fn stereotype(&mut self, runs: usize) -> Vec<f64> {
-        let mut res: Vec<Reservoir> = Vec::with_capacity(runs);
+    pub fn stereotype(&mut self) -> Vec<f64> {
+        let mut res: Vec<Reservoir> = Vec::with_capacity(self.model.runs);
         let seeder: rand::distributions::Uniform<u64> =
             rand::distributions::Uniform::new(0, 10000000);
         let seeds = seeder
             .sample_iter(&mut self.model.range)
-            .take(runs)
+            .take(self.model.runs)
             .collect::<Vec<u64>>();
 
         for seed in seeds {
