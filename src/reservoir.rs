@@ -940,6 +940,18 @@ impl ModelManager {
         }
     }
 
+    /// Set duration of timed runs.
+    pub fn duration(mut self, duration: u64) -> Self {
+        self.duration = duration;
+        self
+    }
+
+    /// Set the range flux rates.
+    pub fn flux_range(mut self, flux_range: &std::ops::Range<f64>) -> Self {
+        self.flux_range = flux_range.to_owned();
+        self
+    }
+
     /// Set model seed.
     pub fn range(mut self, seed: u64) -> Self {
         self.range = rand::SeedableRng::seed_from_u64(seed);
@@ -949,6 +961,12 @@ impl ModelManager {
     /// Set number of model runs.
     pub fn runs(mut self, runs: usize) -> Self {
         self.runs = runs;
+        self
+    }
+
+    /// Set the range of storage rates.
+    pub fn storage_range(mut self, storage_range: &std::ops::Range<f64>) -> Self {
+        self.storage_range = storage_range.to_owned();
         self
     }
 
