@@ -1097,12 +1097,12 @@ impl Fluvial {
         FluvialFit {
             flux_rate,
             storage_rate,
-            ad1: fit[0],
-            ad2: fit[1],
+            ad1: fit[1],
+            ad2: fit[0],
             ch: fit[2],
             kp: fit[3],
-            ks1: fit[4],
-            ks2: fit[5],
+            ks1: fit[5],
+            ks2: fit[4],
         }
     }
 
@@ -1215,8 +1215,7 @@ impl Fluvial {
 
     /// Goodness-of-fit test suite.
     pub fn gof(self, other: &[f64]) -> Result<Vec<f64>, errors::ResError> {
-        let obs = self.sim().mass;
-        let res = utils::gof(&obs, other);
+        let res = utils::gof(&self.mass, other);
         Ok(res)
     }
 
