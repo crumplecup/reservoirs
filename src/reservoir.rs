@@ -1044,6 +1044,15 @@ impl Fluvial {
 
     /// Fit number of runs to gof tests and return mean of each.
     pub fn fit(self, other: &[f64]) -> Vec<f64> {
+        let mut rng = self.manager.range.clone();
+        let seeder: rand::distributions::Uniform<u64> =
+            rand::distributions::Uniform::new(0, 10000000);
+        let seeds: Vec<u64> = seeder
+            .sample_iter(&mut rng)
+            .take(self.manager.runs)
+            .collect();
+
+
         let mut ads = Vec::with_capacity(self.manager.runs as usize);
         let mut adas = Vec::with_capacity(self.manager.runs as usize);
         let mut chs = Vec::with_capacity(self.manager.runs as usize);
@@ -1051,8 +1060,8 @@ impl Fluvial {
         let mut kss = Vec::with_capacity(self.manager.runs as usize);
         let mut ksas = Vec::with_capacity(self.manager.runs as usize);
 
-        for _ in 0..self.manager.runs {
-            let obs = self.clone().sim().mass;
+        for seed in seeds {
+            let obs = self.clone().manager(&self.manager.clone().range(seed)).sim().mass;
             let gof = utils::gof(&obs, other);
             ads.push(gof[0]);
             adas.push(gof[1]);
@@ -1061,6 +1070,7 @@ impl Fluvial {
             kss.push(gof[4]);
             ksas.push(gof[5]);
         }
+
         let res = vec![
             utils::mean(&ads),
             utils::mean(&adas),
