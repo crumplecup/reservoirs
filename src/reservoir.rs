@@ -1261,6 +1261,7 @@ impl Fluvial {
     /// Simulates removal from the reservoir over time based on the rate.
     pub fn sim(mut self) -> Self {
         let mut source_flux = Vec::new();
+        let model = self.manager.clone();
         // let mut rng = self.source[0].range.clone();
         for mut i in self.source.clone() {
             let res = i.stereotype();
@@ -1268,10 +1269,9 @@ impl Fluvial {
         }
         if self.manager.fines {
             let source_gravel = self.clone()
-                .manager(&self.manager.clone().fines(false))
+                .manager(&model.fines(false))
                 .sim().mass;
             source_flux.extend(source_gravel);
-            self.manager.fines(true);
         }
         info!("Selection probability for storage.");
         let mut idx = Vec::new();
