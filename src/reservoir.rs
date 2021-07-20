@@ -1267,7 +1267,7 @@ impl Fluvial {
 
         for i in 0..source_flux.len() {
             let roll = self.manager.range.gen_range(0.0..1.0);
-            if roll > self.flux_rate {
+            if roll < self.storage_rate {
                 source_flux[i] += idx[wts.sample(&mut self.manager.range)];
             }
         }
