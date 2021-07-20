@@ -1271,6 +1271,7 @@ impl Fluvial {
                 .manager(&self.manager.clone().fines(false))
                 .sim().mass;
             source_flux.extend(source_gravel);
+            self.manager.fines(true);
         }
         info!("Selection probability for storage.");
         let mut idx = Vec::new();
