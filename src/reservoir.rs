@@ -1283,6 +1283,7 @@ impl Fluvial {
                 true => {
                     thresh = self.storage_rate_fines;
                     ps.push(utils::fish(thresh, i as f64 / self.turnover));
+                    println!("matching fines");
                 },
                 false => {
                     thresh = self.storage_rate;
