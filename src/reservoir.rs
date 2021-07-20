@@ -917,14 +917,16 @@ impl Default for Model {
 #[derive(Clone, Debug)]
 pub struct ModelManager {
     batch: usize,
+    capture_gravels: std::ops::Range<f64>,
+    capture_fines: std::ops::Range<f64>,
     duration: u64,
     fines: bool,
-    flux_range: std::ops::Range<f64>,
     period: f64,
     range: rand::rngs::StdRng,
     runs: usize,
     source_runs: usize,
-    storage_range: std::ops::Range<f64>,
+    storage_gravels: std::ops::Range<f64>,
+    storage_fines: std::ops::Range<f64>,
 }
 
 /// Methods for modeling.
@@ -933,16 +935,31 @@ impl ModelManager {
     pub fn new() -> ModelManager {
         ModelManager {
             batch: 1,
+            capture_fines: 0.0..1.0,
+            capture_gravels: 0.0..1.0,
             duration: 1,
             fines: false,
-            flux_range: 0.0..1.0,
             period: 100.0,
             range: rand::SeedableRng::seed_from_u64(777),
             runs: 10,
             source_runs: 10,
-            storage_range: 0.0..1.0,
+            storage_fines: 0.0..1.0,
+            storage_gravels: 0.0..1.0,
         }
     }
+
+    /// Set capture rate of fines.
+    pub fn capture_fines(mut self, capture_fines: std::ops::Range<f64>) -> Self {
+        self.capture_fines = capture_fines;
+        self
+    }
+
+    /// Set capture rate of gravels.
+    pub fn capture_gravels(mut self, capture_gravels: std::ops::Range<f64>) -> Self {
+        self.capture_gravels = capture_gravels;
+        self
+    }
+
 
     /// Set duration of timed runs.
     pub fn duration(mut self, duration: u64) -> Self {
@@ -956,11 +973,6 @@ impl ModelManager {
         self
     }
 
-    /// Set the range flux rates.
-    pub fn flux_range(mut self, flux_range: std::ops::Range<f64>) -> Self {
-        self.flux_range = flux_range;
-        self
-    }
 
     /// Set model seed.
     pub fn range(mut self, seed: u64) -> Self {
@@ -986,11 +998,18 @@ impl ModelManager {
         self
     }
 
-    /// Set the range of storage rates.
-    pub fn storage_range(mut self, storage_range: std::ops::Range<f64>) -> Self {
-        self.storage_range = storage_range;
+    /// Set the range of storage rates for fines.
+    pub fn storage_fines(mut self, storage_fines: std::ops::Range<f64>) -> Self {
+        self.storage_fines = storage_fines;
         self
     }
+
+    /// Set the range of storage rates for gravels.
+    pub fn storage_gravels(mut self, storage_gravels: std::ops::Range<f64>) -> Self {
+        self.storage_gravels = storage_gravels;
+        self
+    }
+
 
 }
 
@@ -1003,8 +1022,10 @@ impl Default for ModelManager {
 /// Struct for model run statistics.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct FluvialFit {
-    flux_rate: f64,
-    storage_rate: f64,
+    capture_rate_fines: f64,
+    capture_rate_gravels: f64,
+    storage_rate_fines: f64,
+    storage_rate_gravels: f64,
     ad1: f64,
     ad2: f64,
     ch: f64,
@@ -1041,12 +1062,13 @@ impl FluvialFit {
 /// Fluvial traversal struct for gravels and fines.
 #[derive(Clone, Debug)]
 pub struct Fluvial {
-    flux_rate: f64,
+    capture_rate_fines: f64,
+    capture_rate_gravels: f64,
     manager: ModelManager,
     mass: Vec<f64>,
     source: Vec<Reservoir>,
-    storage_rate: f64,
     storage_rate_fines: f64,
+    storage_rate_gravels: f64,
     turnover: f64,
 }
 
@@ -1054,12 +1076,13 @@ impl Fluvial {
     /// New fluvial struct
     pub fn new() -> Fluvial {
         Fluvial {
-            flux_rate: 0.0,
+            capture_rate_fines: 0.0,
+            capture_rate_gravels: 0.0,
             manager: ModelManager::new(),
             mass: Vec::new(),
             source: Vec::new(),
-            storage_rate: 0.0,
             storage_rate_fines: 0.0,
+            storage_rate_gravels: 0.0,
             turnover: 0.0,
         }
     }
@@ -1105,19 +1128,26 @@ impl Fluvial {
 
     /// Fits a given flux probability and storage rate to an empiric record.
     pub fn fit_rate(mut self, other: &[f64]) -> FluvialFit {
-        // let mut rng = self.manager.range.clone();
-        let flux_range = rand::distributions::Uniform::from(self.manager.flux_range.clone());
-        let flux_rate = flux_range.sample(&mut self.manager.range);
-        let storage_range = rand::distributions::Uniform::from(self.manager.storage_range.clone());
-        let storage_rate = storage_range.sample(&mut self.manager.range);
+        let capture_fines = rand::distributions::Uniform::from(self.manager.capture_fines.clone());
+        let capture_rate_fines = capture_fines.sample(&mut self.manager.range);
+        let capture_gravels = rand::distributions::Uniform::from(self.manager.capture_gravels.clone());
+        let capture_rate_gravels = capture_gravels.sample(&mut self.manager.range);
+        let storage_fines = rand::distributions::Uniform::from(self.manager.storage_fines.clone());
+        let storage_rate_fines = storage_fines.sample(&mut self.manager.range);
+        let storage_gravels = rand::distributions::Uniform::from(self.manager.storage_gravels.clone());
+        let storage_rate_gravels = storage_gravels.sample(&mut self.manager.range);
 
         let fit = self
-            .flux_rate(&flux_rate)
-            .storage_rate(&storage_rate)
+            .capture_rate_fines(capture_rate_fines)
+            .capture_rate_gravels(capture_rate_gravels)
+            .storage_rate_fines(storage_rate_fines)
+            .storage_rate_gravels(storage_rate_gravels)
             .fit(other);
         FluvialFit {
-            flux_rate,
-            storage_rate,
+            capture_rate_fines,
+            capture_rate_gravels,
+            storage_rate_fines,
+            storage_rate_gravels,
             ad1: fit[1],
             ad2: fit[0],
             ch: fit[2],
@@ -1224,10 +1254,15 @@ impl Fluvial {
         Ok(rec)
     }
 
-    /// Represents the probability of particles routing to the flux pool.
-    /// Particles have a (1 - flux_rate) chance of routing to the storage pool.
-    pub fn flux_rate(mut self, flux_rate: &f64) -> Self {
-        self.flux_rate = flux_rate.to_owned();
+    /// Represents the probability of fines routing to the storage pool.
+    pub fn capture_rate_fines(mut self, capture_rate_fines: f64) -> Self {
+        self.capture_rate_fines = capture_rate_fines;
+        self
+    }
+
+    /// Represents the probability of gravels routing to the storage pool.
+    pub fn capture_rate_gravels(mut self, capture_rate_gravels: f64) -> Self {
+        self.capture_rate_gravels = capture_rate_gravels;
         self
     }
 
@@ -1281,12 +1316,12 @@ impl Fluvial {
             idx.push(i as f64);
             match self.manager.fines {
                 true => {
-                    thresh = self.flux_rate;
+                    thresh = self.capture_rate_fines;
                     ps.push(utils::fish(self.storage_rate_fines, i as f64 / self.turnover));
                 },
                 false => {
-                    thresh = self.storage_rate;
-                    ps.push(utils::fish(thresh, i as f64 / self.turnover));
+                    thresh = self.capture_rate_gravels;
+                    ps.push(utils::fish(self.storage_rate_gravels, i as f64 / self.turnover));
                 },
             }
         }
@@ -1309,15 +1344,15 @@ impl Fluvial {
         self
     }
 
-    /// Sets the rate of the Poisson distribution defining the PMF of storage time.
-    pub fn storage_rate(mut self, storage_rate: &f64) -> Self {
-        self.storage_rate = storage_rate.to_owned();
+    /// Sets the rate of the Poisson distribution defining the PMF of storage time for fines.
+    pub fn storage_rate_fines(mut self, storage_rate_fines: f64) -> Self {
+        self.storage_rate_fines = storage_rate_fines;
         self
     }
 
     /// Sets the rate of the Poisson distribution defining the PMF of storage time for fines.
-    pub fn storage_rate_fines(mut self, storage_rate_fines: f64) -> Self {
-        self.storage_rate_fines = storage_rate_fines;
+    pub fn storage_rate_gravels(mut self, storage_rate_gravels: f64) -> Self {
+        self.storage_rate_gravels = storage_rate_gravels;
         self
     }
 
