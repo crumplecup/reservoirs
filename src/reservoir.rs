@@ -1261,7 +1261,7 @@ impl Fluvial {
         let mut ps = Vec::new();
         for i in 0..self.manager.period as i32 {
             idx.push(i as f64);
-            ps.push(utils::fish(self.flux_rate, i as f64 / self.turnover));
+            ps.push(utils::fish(self.storage_rate, i as f64 / self.turnover));
         }
         let wts = rand::distributions::WeightedIndex::new(&ps).unwrap();
 
