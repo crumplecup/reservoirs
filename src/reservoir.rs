@@ -1281,8 +1281,8 @@ impl Fluvial {
             idx.push(i as f64);
             match self.manager.fines {
                 true => {
-                    thresh = self.storage_rate_fines;
-                    ps.push(utils::fish(thresh, i as f64 / self.turnover));
+                    thresh = self.flux_rate;
+                    ps.push(utils::fish(self.storage_rate_fines, i as f64 / self.turnover));
                 },
                 false => {
                     thresh = self.storage_rate;
