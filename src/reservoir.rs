@@ -918,6 +918,7 @@ impl Default for Model {
 pub struct ModelManager {
     batch: usize,
     duration: u64,
+    fines: bool,
     flux_range: std::ops::Range<f64>,
     period: f64,
     range: rand::rngs::StdRng,
@@ -933,6 +934,7 @@ impl ModelManager {
         ModelManager {
             batch: 1,
             duration: 1,
+            fines: false,
             flux_range: 0.0..1.0,
             period: 100.0,
             range: rand::SeedableRng::seed_from_u64(777),
@@ -945,6 +947,12 @@ impl ModelManager {
     /// Set duration of timed runs.
     pub fn duration(mut self, duration: u64) -> Self {
         self.duration = duration;
+        self
+    }
+
+    /// Set to true to produce fines with Fluvial::sim().
+    pub fn fines(mut self, fines: bool) -> Self {
+        self.fines = fines;
         self
     }
 
@@ -1256,6 +1264,12 @@ impl Fluvial {
             let res = i.stereotype();
             source_flux.extend(res);
         }
+        if self.manager.fines {
+            let source_gravel = self.clone()
+                .manager(&self.manager.clone().fines(false))
+                .sim().mass;
+            source_flux.extend(source_gravel);
+        }
         info!("Selection probability for storage.");
         let mut idx = Vec::new();
         let mut ps = Vec::new();
@@ -1265,16 +1279,17 @@ impl Fluvial {
         }
         let wts = rand::distributions::WeightedIndex::new(&ps).unwrap();
 
-        for i in 0..source_flux.len() {
+        for item in &mut source_flux {
             let roll = self.manager.range.gen_range(0.0..1.0);
             if roll < self.storage_rate {
-                source_flux[i] += idx[wts.sample(&mut self.manager.range)];
+                *item += idx[wts.sample(&mut self.manager.range)];
             }
         }
 
         self.mass = source_flux;
         self
     }
+
 
     /// Sets source reservoirs.
     pub fn source(mut self, source: &[Reservoir]) -> Self {
