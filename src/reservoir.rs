@@ -1046,6 +1046,7 @@ pub struct Fluvial {
     mass: Vec<f64>,
     source: Vec<Reservoir>,
     storage_rate: f64,
+    storage_rate_fines: f64,
     turnover: f64,
 }
 
@@ -1058,6 +1059,7 @@ impl Fluvial {
             mass: Vec::new(),
             source: Vec::new(),
             storage_rate: 0.0,
+            storage_rate_fines: 0.0,
             turnover: 0.0,
         }
     }
@@ -1273,15 +1275,24 @@ impl Fluvial {
         info!("Selection probability for storage.");
         let mut idx = Vec::new();
         let mut ps = Vec::new();
+        let mut thresh = 0.0;
         for i in 0..self.manager.period as i32 {
             idx.push(i as f64);
-            ps.push(utils::fish(self.storage_rate, i as f64 / self.turnover));
+            match self.manager.fines {
+                true => {
+                    thresh = self.storage_rate_fines;
+                    ps.push(utils::fish(thresh, i as f64 / self.turnover));
+                },
+                false => {
+                    thresh = self.storage_rate;
+                    ps.push(utils::fish(thresh, i as f64 / self.turnover));
+                },
+            }
         }
         let wts = rand::distributions::WeightedIndex::new(&ps).unwrap();
-
         for item in &mut source_flux {
             let roll = self.manager.range.gen_range(0.0..1.0);
-            if roll < self.storage_rate {
+            if roll < thresh {
                 *item += idx[wts.sample(&mut self.manager.range)];
             }
         }
@@ -1300,6 +1311,12 @@ impl Fluvial {
     /// Sets the rate of the Poisson distribution defining the PMF of storage time.
     pub fn storage_rate(mut self, storage_rate: &f64) -> Self {
         self.storage_rate = storage_rate.to_owned();
+        self
+    }
+
+    /// Sets the rate of the Poisson distribution defining the PMF of storage time for fines.
+    pub fn storage_rate_fines(mut self, storage_rate_fines: f64) -> Self {
+        self.storage_rate_fines = storage_rate_fines;
         self
     }
 
