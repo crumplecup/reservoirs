@@ -1292,7 +1292,7 @@ impl Fluvial {
         let seeder: rand::distributions::Uniform<u64> =
             rand::distributions::Uniform::new(0, 10000000);
         
-        for _ in 0..self.manager.runs {
+        for _ in 0..self.manager.source_runs {
             let mut fit = self.clone();
             fit.manager = fit.manager.range(seeder.sample(&mut self.manager.range)).clone();
             let mut new = fit.sim().mass;
