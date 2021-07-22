@@ -921,6 +921,7 @@ pub struct ModelManager {
     capture_fines: std::ops::Range<f64>,
     duration: u64,
     fines: bool,
+    obs: Vec<f64>,
     period: f64,
     range: rand::rngs::StdRng,
     runs: usize,
@@ -939,6 +940,7 @@ impl ModelManager {
             capture_gravels: 0.0..1.0,
             duration: 1,
             fines: false,
+            obs: Vec::new(),
             period: 100.0,
             range: rand::SeedableRng::seed_from_u64(777),
             runs: 10,
@@ -983,6 +985,13 @@ impl ModelManager {
     /// Set number of model runs.
     pub fn runs(mut self, runs: usize) -> Self {
         self.runs = runs;
+        self
+    }
+
+
+    /// Set period length of model runs.
+    pub fn obs(mut self, obs: &[f64]) -> Self {
+        self.obs = obs.to_owned();
         self
     }
 
@@ -1278,12 +1287,20 @@ impl Fluvial {
     }
 
     /// Runs sim() a number of times specified by ModelManager struct.
-    pub fn n_sim(self) -> Result<Vec<Vec<f64>>, errors::ResError> {
-        let mut res = Vec::new();
+    pub fn n_sim(mut self) -> Vec<f64> {
+        let mut rec = Vec::new();
+        let seeder: rand::distributions::Uniform<u64> =
+            rand::distributions::Uniform::new(0, 10000000);
+        
         for _ in 0..self.manager.runs {
-            res.push(self.clone().sim().mass);
+            let mut fit = self.clone();
+            fit.manager = fit.manager.range(seeder.sample(&mut self.manager.range)).clone();
+            let mut new = fit.sim().mass;
+            {
+                rec.append(&mut new);
+            }
         }
-        Ok(res)
+        rec
     }
 
 
@@ -1298,16 +1315,21 @@ impl Fluvial {
         let mut source_flux = Vec::new();
         let model = self.manager.clone();
         // let mut rng = self.source[0].range.clone();
-        for mut i in self.source.clone() {
-            let res = i.stereotype();
+        for i in self.source.clone() {
+            let res = i.n_sim();
             source_flux.extend(res);
         }
         if self.manager.fines {
             let source_gravel = self.clone()
                 .manager(&model.fines(false))
-                .sim().mass;
+                .n_sim();
             source_flux.extend(source_gravel);
         }
+        let mut source = Vec::new();
+        for _ in 0..self.manager.obs.len() {
+            source.push(source_flux[self.manager.range.gen_range(0..self.manager.obs.len())]);
+        }
+        let mut source_flux = source;
         info!("Selection probability for storage.");
         let mut idx = Vec::new();
         let mut ps = Vec::new();
@@ -1506,6 +1528,24 @@ impl Reservoir {
             inherit: None,
             range: rand::rngs::StdRng::from_entropy(),
         }
+    }
+
+
+    /// Runs sim() a number of times specified by ModelManager struct.
+    pub fn n_sim(mut self) -> Vec<f64> {
+        let mut rec = Vec::new();
+        let seeder: rand::distributions::Uniform<u64> =
+            rand::distributions::Uniform::new(0, 10000000);
+        
+        for _ in 0..self.model.source_runs {
+            let mut fit = self.clone();
+            fit.model = fit.model.range(seeder.sample(&mut self.model.range)).clone();
+            let mut new = fit.sim().mass;
+            {
+                rec.append(&mut new);
+            }
+        }
+        rec
     }
 
     /// Assign an output rate to a reservoir.
