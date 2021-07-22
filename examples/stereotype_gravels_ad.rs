@@ -3,14 +3,17 @@ use reservoirs::prelude::*;
 fn main() {
     // Load charcoal age data.
     // Change directory path for user, panics on invalid path
+    let dep = Sample::read("/home/erik/data/dep.csv").unwrap(); // Mean charcoal ages of deposits.
+    let fg: Vec<f64> = dep.iter().filter(|x| x.facies == "FG").map(|x| x.age).collect(); // Mean gravel deposit ages.
     let iat = Sample::read("/home/erik/data/iat.csv").unwrap(); // Inherited ages of charcoal in deposits.
     let ia: Vec<f64> = iat.iter().map(|x| x.age).collect(); // Vector of inherited ages from all classes of deposits.
 
     // Set model parameters.
     let model = ModelManager::new()
+        .obs(&fg) // Observations to fit.
         .period(40000.0) // Time period of individual simulations in years.
         .range(777) // Seed for rng for reproducibility.
-        .runs(20) // Number of times to run the model per sampling point.
+        .runs(30) // Number of times to run the model per sampling point.
         .source_runs(1); // Number of times to run the model per gravel source.
 
     // Source deposits for gravels.

@@ -10,13 +10,14 @@ fn main() {
 
     // Set model parameters.
     let model = ModelManager::new()
-        .capture_gravels(0.0..0.4) // Range of gravel capture rates to model.
+        .capture_gravels(0.0..0.3) // Range of gravel capture rates to model.
         .duration(10000) // Duration of timed() searches in hours.
+        .obs(&fg) // Observations to fit.
         .period(40000.0) // Time period of individual simulations in years.
-        .range(1000) // Seed for rng for reproducibility.
-        .runs(40) // Number of times to run the model per sampling point.
-        .source_runs(1) // Number of times to run the model per gravel source.
-        .storage_gravels(0.0..0.4); // Range of gravel storage rates to model.
+        .range(777) // Seed for rng for reproducibility.
+        .runs(20) // Number of times to run the model per sampling point.
+        .source_runs(10) // Number of times to run the model per gravel source.
+        .storage_gravels(0.0..0.3); // Range of gravel storage rates to model.
 
     // Source deposits for gravels.
     let debris_flows = Reservoir::new()
@@ -33,5 +34,5 @@ fn main() {
 
     // Fit model to observed deposit ages for specified duration.
     // Change directory path for user, panics on invalid path
-    fluvial.fit_rates_timed(&fg, "/home/erik/output/gravels_ad_40x_1000.csv").unwrap();
+    fluvial.fit_rates_timed(&fg, "/home/erik/output/gravels_ad_20x_777.csv").unwrap();
 }

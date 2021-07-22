@@ -12,6 +12,7 @@ fn main() {
     let model = ModelManager::new()
         .capture_gravels(0.0..0.4) // Range of gravel capture rates to model.
         .duration(10000) // Duration of timed() searches in hours.
+        .obs(&fg) // Observations to fit.
         .period(40000.0) // Time period of individual simulations in years.
         .range(1000) // Seed for rng for reproducibility.
         .runs(40) // Number of times to run the model per sampling point.
