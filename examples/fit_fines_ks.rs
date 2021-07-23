@@ -4,7 +4,11 @@ fn main() {
     // Load charcoal age data.
     // Change directory path for user, panics on invalid path
     let dep = Sample::read("/home/erik/data/dep.csv").unwrap(); // Mean charcoal ages of deposits.
-    let ff: Vec<f64> = dep.iter().filter(|x| x.facies == "FF").map(|x| x.age).collect(); // Mean fines deposit ages.
+    let ff: Vec<f64> = dep
+        .iter()
+        .filter(|x| x.facies == "FF")
+        .map(|x| x.age)
+        .collect(); // Mean fines deposit ages.
     let iat = Sample::read("/home/erik/data/iat.csv").unwrap(); // Mean inherited ages of charcoal in deposits.
     let ia: Vec<f64> = iat.iter().map(|x| x.age).collect(); // Vector of inherited ages from all classes of deposits.
 
@@ -24,8 +28,10 @@ fn main() {
 
     // Source deposits for gravels.
     let debris_flows = Reservoir::new()
-        .input(&0.89).unwrap() // Input rate for debris-flow deposits from the Kolmogorov-Smirnov test.
-        .output(&0.89).unwrap() // Output rate for fluvial removal of deposits from the Kolmogorov-Smirnov test.
+        .input(&0.89)
+        .unwrap() // Input rate for debris-flow deposits from the Kolmogorov-Smirnov test.
+        .output(&0.89)
+        .unwrap() // Output rate for fluvial removal of deposits from the Kolmogorov-Smirnov test.
         .inherit(&ia) // Inherited ages of charcoal in debris-flow deposits.
         .model(&model); // Load model parameters.
 
@@ -37,5 +43,7 @@ fn main() {
 
     // Fit model to observed deposit ages for specified duration.
     // Change directory path for user, panics on invalid path
-    fluvial.fit_rates_timed(&ff, "/home/erik/output/fines_ks_20x_1000.csv").unwrap();
+    fluvial
+        .fit_rates_timed(&ff, "/home/erik/output/fines_ks_20x_1000.csv")
+        .unwrap();
 }

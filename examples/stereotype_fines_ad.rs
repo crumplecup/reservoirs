@@ -4,7 +4,11 @@ fn main() {
     // Load charcoal age data.
     // Change directory path for user, panics on invalid path
     let dep = Sample::read("/home/erik/data/dep.csv").unwrap(); // Mean charcoal ages of deposits.
-    let fg: Vec<f64> = dep.iter().filter(|x| x.facies == "FG").map(|x| x.age).collect(); // Mean gravel deposit ages.
+    let fg: Vec<f64> = dep
+        .iter()
+        .filter(|x| x.facies == "FG")
+        .map(|x| x.age)
+        .collect(); // Mean gravel deposit ages.
     let iat = Sample::read("/home/erik/data/iat.csv").unwrap(); // Inherited ages of charcoal in deposits.
     let ia: Vec<f64> = iat.iter().map(|x| x.age).collect(); // Vector of inherited ages from all classes of deposits.
 
@@ -19,14 +23,16 @@ fn main() {
 
     // Source deposits for gravels.
     let debris_flows = Reservoir::new()
-        .input(&0.35).unwrap() // Input rate for debris-flow deposits from the Anderson-Darling test.
-        .output(&0.35).unwrap() // Output rate for fluvial removal of deposits from the Anderson-Darling test.
+        .input(&0.35)
+        .unwrap() // Input rate for debris-flow deposits from the Anderson-Darling test.
+        .output(&0.35)
+        .unwrap() // Output rate for fluvial removal of deposits from the Anderson-Darling test.
         .inherit(&ia) // Inherited ages of charcoal in debris-flow deposits.
         .model(&model); // Load model parameters.
 
     // Reservoir for gravel deposits.
     let fluvial = Fluvial::new()
-        .source(&[debris_flows.clone()]) // Set source as debris-flow deposits.
+        .source(&debris_flows) // Set source as debris-flow deposits.
         .turnover(&318.0) // Set turnover period from the Anderson-Darling test.
         .manager(&model); // Load model parameters.
 
@@ -37,6 +43,6 @@ fn main() {
         .storage_rate_fines(0.1) // Set storage rate for fines in storage from the Anderson-Darling test.
         .storage_rate_gravels(0.1) // Set storage rate for gravels in storage from the Anderson-Darling test.
         .stereotype_rate(); // Return run in model.runs most characteristic of the distribution using the K-S test.
-    // Change directory path for user, panics on invalid path
+                            // Change directory path for user, panics on invalid path
     utils::record(&mut stereo, "/home/erik/output/fines_stereo_ad.csv").unwrap();
 }

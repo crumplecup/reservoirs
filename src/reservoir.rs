@@ -392,11 +392,7 @@ impl Model {
         for seed in seeds {
             res.push(self.reservoir.clone().range(seed));
         }
-        res = res
-            .par_iter()
-            .cloned()
-            .map(|x| x.sim())
-            .collect();
+        res = res.par_iter().cloned().map(|x| x.sim()).collect();
         let fits: Vec<Fit> = res.par_iter().cloned().map(|x| x.gof(other)).collect();
         let ads: Vec<f64> = fits.iter().map(|x| x.ad).collect();
         let ad = utils::median(&ads);
@@ -780,11 +776,7 @@ impl Model {
             // make boot number copies of reservoir
             res.push(self.clone().reservoir(self.reservoir.clone().range(seed)));
         }
-        let res: Vec<Reservoir> = res
-            .par_iter()
-            .cloned()
-            .map(|x| x.reservoir.sim())
-            .collect(); // simulate accumulation record for each copy
+        let res: Vec<Reservoir> = res.par_iter().cloned().map(|x| x.reservoir.sim()).collect(); // simulate accumulation record for each copy
         let mut ns: Vec<f64> = res
             .par_iter()
             .cloned()
@@ -855,11 +847,7 @@ impl Model {
         for seed in seeds {
             res.push(self.reservoir.clone().range(seed));
         }
-        res = res
-            .par_iter()
-            .cloned()
-            .map(|x| x.sim())
-            .collect();
+        res = res.par_iter().cloned().map(|x| x.sim()).collect();
 
         let index = 0..self.range;
         let mut out = vec![Complex::new(0.0, 0.0); index.len()];
@@ -921,6 +909,7 @@ pub struct ModelManager {
     capture_fines: std::ops::Range<f64>,
     duration: u64,
     fines: bool,
+    index: std::ops::Range<i32>,
     obs: Vec<f64>,
     period: f64,
     range: rand::rngs::StdRng,
@@ -940,6 +929,7 @@ impl ModelManager {
             capture_gravels: 0.0..1.0,
             duration: 1,
             fines: false,
+            index: 0..1000,
             obs: Vec::new(),
             period: 100.0,
             range: rand::SeedableRng::seed_from_u64(777),
@@ -962,7 +952,6 @@ impl ModelManager {
         self
     }
 
-
     /// Set duration of timed runs.
     pub fn duration(mut self, duration: u64) -> Self {
         self.duration = duration;
@@ -975,6 +964,11 @@ impl ModelManager {
         self
     }
 
+    /// Set the index range for transit_times().
+    pub fn index(mut self, index: std::ops::Range<i32>) -> Self {
+        self.index = index;
+        self
+    }
 
     /// Set model seed.
     pub fn range(mut self, seed: u64) -> Self {
@@ -988,7 +982,6 @@ impl ModelManager {
         self
     }
 
-
     /// Set period length of model runs.
     pub fn obs(mut self, obs: &[f64]) -> Self {
         self.obs = obs.to_owned();
@@ -999,6 +992,17 @@ impl ModelManager {
     pub fn period(mut self, period: f64) -> Self {
         self.period = period;
         self
+    }
+
+    /// Return a vector of struct clones with unique but reproducible seeds.
+    pub fn seed_clones(mut self) -> Vec<ModelManager> {
+        let mut res = Vec::with_capacity(self.runs);
+        let seeder: rand::distributions::Uniform<u64> =
+            rand::distributions::Uniform::new(0, 10000000);
+        for _ in 0..self.runs {
+            res.push(self.clone().range(seeder.sample(&mut self.range)));
+        }
+        res
     }
 
     /// Set the number of runs when estimating source mass (per run of Fluvial::sim()).
@@ -1018,8 +1022,6 @@ impl ModelManager {
         self.storage_gravels = storage_gravels;
         self
     }
-
-
 }
 
 impl Default for ModelManager {
@@ -1106,7 +1108,6 @@ impl Fluvial {
             .take(self.manager.runs)
             .collect();
 
-
         let mut ads = Vec::with_capacity(self.manager.runs as usize);
         let mut adas = Vec::with_capacity(self.manager.runs as usize);
         let mut chs = Vec::with_capacity(self.manager.runs as usize);
@@ -1115,7 +1116,10 @@ impl Fluvial {
         let mut ksas = Vec::with_capacity(self.manager.runs as usize);
 
         for seed in seeds {
-            let fit = self.clone().manager(&self.manager.clone().range(seed)).gof(other);
+            let fit = self
+                .clone()
+                .manager(&self.manager.clone().range(seed))
+                .gof(other);
             ads.push(fit[0]);
             adas.push(fit[1]);
             chs.push(fit[2]);
@@ -1139,11 +1143,13 @@ impl Fluvial {
     pub fn fit_rate(mut self, other: &[f64]) -> FluvialFit {
         let capture_fines = rand::distributions::Uniform::from(self.manager.capture_fines.clone());
         let capture_rate_fines = capture_fines.sample(&mut self.manager.range);
-        let capture_gravels = rand::distributions::Uniform::from(self.manager.capture_gravels.clone());
+        let capture_gravels =
+            rand::distributions::Uniform::from(self.manager.capture_gravels.clone());
         let capture_rate_gravels = capture_gravels.sample(&mut self.manager.range);
         let storage_fines = rand::distributions::Uniform::from(self.manager.storage_fines.clone());
         let storage_rate_fines = storage_fines.sample(&mut self.manager.range);
-        let storage_gravels = rand::distributions::Uniform::from(self.manager.storage_gravels.clone());
+        let storage_gravels =
+            rand::distributions::Uniform::from(self.manager.storage_gravels.clone());
         let storage_rate_gravels = storage_gravels.sample(&mut self.manager.range);
 
         let fit = self
@@ -1197,14 +1203,18 @@ impl Fluvial {
             .par_iter()
             .map(|x| rand_distr::num_traits::abs((x / mid_n) - 1.0))
             .collect::<Vec<f64>>(); // distance from median length
-        // collect reservoir masses into single vector and calculate the cdf
+                                    // collect reservoir masses into single vector and calculate the cdf
         let mut rec = Vec::new(); // vector of mass
         for r in res.clone() {
             rec.append(&mut r.mass.clone()); // add each run to make one long vector
         }
         // let cdf = utils::cdf_bin(&rec, bins); // subsample vector to length bins
 
-        let fit = res.par_iter().cloned().map(|x| x.gof(&rec)).collect::<Vec<Vec<f64>>>(); // ks and kp values
+        let fit = res
+            .par_iter()
+            .cloned()
+            .map(|x| x.gof(&rec))
+            .collect::<Vec<Vec<f64>>>(); // ks and kp values
         let ks = fit.par_iter().cloned().map(|x| x[5]).collect::<Vec<f64>>(); // clip to just ks values
         let mut least = 1.0; // test for lowest fit (set to high value)
         let mut low = Fluvial::new(); // initialize variable to hold lowest fit
@@ -1228,14 +1238,21 @@ impl Fluvial {
         let mut res = Vec::new();
         for _ in 0..self.manager.batch {
             let mut fit = self.clone();
-            fit.manager = fit.manager.range(seeder.sample(&mut self.manager.range)).clone();
+            fit.manager = fit
+                .manager
+                .range(seeder.sample(&mut self.manager.range))
+                .clone();
             res.push(fit.fit_rate(&other));
         }
         res
     }
 
     /// Run fit_rates() for a set duration.
-    pub fn fit_rates_timed(mut self, other: &[f64], path: &str) -> Result<Vec<FluvialFit>, errors::ResError> {
+    pub fn fit_rates_timed(
+        mut self,
+        other: &[f64],
+        path: &str,
+    ) -> Result<Vec<FluvialFit>, errors::ResError> {
         // let mut rng = self.manager.range.clone();
         let seeder: rand::distributions::Uniform<u64> =
             rand::distributions::Uniform::new(0, 10000000);
@@ -1253,7 +1270,10 @@ impl Fluvial {
         }
         while std::time::SystemTime::now() < now + dur {
             let mut fit = self.clone();
-            fit.manager = fit.manager.range(seeder.sample(&mut self.manager.range)).clone();
+            fit.manager = fit
+                .manager
+                .range(seeder.sample(&mut self.manager.range))
+                .clone();
             let mut new = fit.fit_rates(other);
             {
                 rec.append(&mut new);
@@ -1287,11 +1307,11 @@ impl Fluvial {
     }
 
     /// Runs sim() a number of times specified by ModelManager struct.
-    pub fn n_sim(mut self) -> Vec<f64> {
-        let mut rec = Vec::new();
+    pub fn n_sim(self) -> Vec<f64> {
+        /*let mut rec = Vec::new();
         let seeder: rand::distributions::Uniform<u64> =
             rand::distributions::Uniform::new(0, 10000000);
-        
+
         for _ in 0..self.manager.source_runs {
             let mut fit = self.clone();
             fit.manager = fit.manager.range(seeder.sample(&mut self.manager.range)).clone();
@@ -1300,9 +1320,17 @@ impl Fluvial {
                 rec.append(&mut new);
             }
         }
-        rec
+        */
+        let mut res = Vec::new();
+        let _ = self
+            .clone()
+            .manager
+            .seed_clones()
+            .iter()
+            .map(|x| res.extend(self.clone().manager(x).sim().mass))
+            .collect::<()>();
+        res
     }
-
 
     /// Prints csv of reservoir mass to file path.
     pub fn record_mass(mut self, path: &str) -> Result<(), errors::ResError> {
@@ -1312,9 +1340,14 @@ impl Fluvial {
 
     /// Simulates removal from the reservoir over time based on the rate.
     pub fn sim(mut self) -> Self {
+        let wts = rand::distributions::WeightedIndex::new(&self.source).unwrap();
+        let mut index = Vec::new();
+        for i in self.manager.index.clone() {
+            index.push(i as f64);
+        }
         let mut source_flux = Vec::new();
         for _ in 0..self.manager.obs.len() {
-            source_flux.push(self.source[self.manager.range.gen_range(0..self.source.len())]);
+            source_flux.push(index[wts.sample(&mut self.manager.range)]);
         }
         info!("Selection probability for storage.");
         let mut idx = Vec::new();
@@ -1325,12 +1358,18 @@ impl Fluvial {
             match self.manager.fines {
                 true => {
                     thresh = self.capture_rate_fines;
-                    ps.push(utils::fish(self.storage_rate_fines, i as f64 / self.turnover));
-                },
+                    ps.push(utils::fish(
+                        self.storage_rate_fines,
+                        i as f64 / self.turnover,
+                    ));
+                }
                 false => {
                     thresh = self.capture_rate_gravels;
-                    ps.push(utils::fish(self.storage_rate_gravels, i as f64 / self.turnover));
-                },
+                    ps.push(utils::fish(
+                        self.storage_rate_gravels,
+                        i as f64 / self.turnover,
+                    ));
+                }
             }
         }
         let wts = rand::distributions::WeightedIndex::new(&ps).unwrap();
@@ -1345,21 +1384,24 @@ impl Fluvial {
         self
     }
 
-
     /// Sets source flux for reservoirs.
     pub fn source(mut self, source: &Reservoir) -> Self {
-        let mut source_flux = Vec::new();
-        let model = self.manager.clone();
-        source_flux.extend(source.clone().n_sim());
-        if self.manager.fines {
-            self.source = source_flux.clone();
-            let source_gravel = self.clone()
-                .manager(&model.fines(false))
-                .n_sim();
-            source_flux.extend(source_gravel);
-        }
+        let source_flux = source.clone().transit_times();
+
+        // if self.manager.fines {
+        //     let source_gravel = source.model(&model.fines(false)).transit_times();
+        //     source_flux.extend(source_gravel);
+        // }
         self.source = source_flux;
         self
+    }
+
+    /// Sets source flux from csv.
+    /// To save and reuse large samples that are computationally intensive.
+    pub fn source_from_csv(mut self, path: &str) -> Result<Self, errors::ResError> {
+        let source = utils::read_f64(path)?;
+        self.source = source;
+        Ok(self)
     }
 
     /// Sets the rate of the Poisson distribution defining the PMF of storage time for fines.
@@ -1372,6 +1414,54 @@ impl Fluvial {
     pub fn storage_rate_gravels(mut self, storage_rate_gravels: f64) -> Self {
         self.storage_rate_gravels = storage_rate_gravels;
         self
+    }
+
+    /// Return CDF of transit times based on model parameters.
+    pub fn transit_times(self) -> Vec<f64> {
+        let res = self
+            .clone()
+            .manager
+            .seed_clones()
+            .iter()
+            .map(|x| self.clone().manager(x).sim())
+            .collect::<Vec<Fluvial>>();
+
+        let index = self.manager.index;
+        let mut out = vec![Complex::new(0.0, 0.0); index.len()];
+        let mut real_planner = RealFftPlanner::<f64>::new();
+        info!("Constructing FftPlanner for fourier transforms.");
+        let r2c = real_planner.plan_fft_forward(index.len() + 1);
+        for r in res {
+            let cdf = utils::cdf_rng(&r.mass, &index);
+            let mut pmf = utils::pmf_from_cdf(&cdf);
+            let mut spectrum = r2c.make_output_vec();
+            info!("Forward transforming the pmf using fft.");
+            r2c.process(&mut pmf, &mut spectrum).unwrap();
+            info!("Summing transformed pmfs.");
+            out = out
+                .iter()
+                .zip(spectrum.iter())
+                .map(|(a, b)| a + b)
+                .collect::<Vec<Complex<f64>>>();
+        }
+        info!("Constructing FftPlanner for inverse fourier transforms.");
+        let c2r = real_planner.plan_fft_inverse(index.len() + 1);
+        info!("Inverse fourier transform using fft.");
+        let mut out_data = c2r.make_output_vec();
+        c2r.process(&mut out, &mut out_data).unwrap();
+        info!("Normalize output by dividing by length.");
+        out_data = out_data
+            .par_iter()
+            .map(|a| a / index.len() as f64)
+            .collect::<Vec<f64>>();
+        info!("Normalize output by dividing by sum of pmfs (having added several pmfs together).");
+        let sum_out = out_data.iter().fold(0.0, |acc, x| acc + *x);
+        out_data = out_data
+            .par_iter()
+            .map(|a| a / sum_out)
+            .collect::<Vec<f64>>();
+
+        out_data
     }
 
     /// Sets length of the turnover period.
@@ -1526,16 +1616,18 @@ impl Reservoir {
         }
     }
 
-
     /// Runs sim() a number of times specified by ModelManager struct.
     pub fn n_sim(mut self) -> Vec<f64> {
         let mut rec = Vec::new();
         let seeder: rand::distributions::Uniform<u64> =
             rand::distributions::Uniform::new(0, 10000000);
-        
+
         for _ in 0..self.model.source_runs {
             let mut fit = self.clone();
-            fit.model = fit.model.range(seeder.sample(&mut self.model.range)).clone();
+            fit.model = fit
+                .model
+                .range(seeder.sample(&mut self.model.range))
+                .clone();
             let mut new = fit.sim().mass;
             {
                 rec.append(&mut new);
@@ -1683,14 +1775,18 @@ impl Reservoir {
             .iter()
             .map(|x| rand_distr::num_traits::abs((x / mid_n) - 1.0))
             .collect(); // distance from median length
-        // collect reservoir masses into single vector and calculate the cdf
+                        // collect reservoir masses into single vector and calculate the cdf
         let mut rec = Vec::new(); // vector of mass
         for r in res.clone() {
             rec.append(&mut r.mass.clone()); // add each run to make one long vector
         }
         // let cdf = utils::cdf_bin(&rec, bins); // subsample vector to length bins
 
-        let gof = res.iter().cloned().map(|x| x.gof(&rec)).collect::<Vec<Fit>>(); // ks and kp values
+        let gof = res
+            .iter()
+            .cloned()
+            .map(|x| x.gof(&rec))
+            .collect::<Vec<Fit>>(); // ks and kp values
         let ks = gof.iter().cloned().map(|x| x.ks).collect::<Vec<f64>>(); // clip to just ks values
         let mut least = 1.0; // test for lowest fit (set to high value)
         let mut low = Reservoir::new(); // initialize variable to hold lowest fit
@@ -1706,6 +1802,53 @@ impl Reservoir {
         low.mass
     }
 
+    /// Return CDF of transit times based on model parameters.
+    pub fn transit_times(self) -> Vec<f64> {
+        let res = self
+            .clone()
+            .model
+            .seed_clones()
+            .iter()
+            .map(|x| self.clone().model(x).sim())
+            .collect::<Vec<Reservoir>>();
+
+        let index = self.model.index;
+        let mut out = vec![Complex::new(0.0, 0.0); index.len()];
+        let mut real_planner = RealFftPlanner::<f64>::new();
+        info!("Constructing FftPlanner for fourier transforms.");
+        let r2c = real_planner.plan_fft_forward(index.len() + 1);
+        for r in res {
+            let cdf = utils::cdf_rng(&r.mass, &index);
+            let mut pmf = utils::pmf_from_cdf(&cdf);
+            let mut spectrum = r2c.make_output_vec();
+            info!("Forward transforming the pmf using fft.");
+            r2c.process(&mut pmf, &mut spectrum).unwrap();
+            info!("Summing transformed pmfs.");
+            out = out
+                .iter()
+                .zip(spectrum.iter())
+                .map(|(a, b)| a + b)
+                .collect::<Vec<Complex<f64>>>();
+        }
+        info!("Constructing FftPlanner for inverse fourier transforms.");
+        let c2r = real_planner.plan_fft_inverse(index.len() + 1);
+        info!("Inverse fourier transform using fft.");
+        let mut out_data = c2r.make_output_vec();
+        c2r.process(&mut out, &mut out_data).unwrap();
+        info!("Normalize output by dividing by length.");
+        out_data = out_data
+            .par_iter()
+            .map(|a| a / index.len() as f64)
+            .collect::<Vec<f64>>();
+        info!("Normalize output by dividing by sum of pmfs (having added several pmfs together).");
+        let sum_out = out_data.iter().fold(0.0, |acc, x| acc + *x);
+        out_data = out_data
+            .par_iter()
+            .map(|a| a / sum_out)
+            .collect::<Vec<f64>>();
+
+        out_data
+    }
 }
 
 impl Default for Reservoir {

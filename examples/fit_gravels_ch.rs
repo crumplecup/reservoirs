@@ -3,36 +3,35 @@ use reservoirs::prelude::*;
 fn main() {
     // Load charcoal age data.
     // Change directory path for user, panics on invalid path
-    let dep = Sample::read("/home/erik/data/dep.csv").unwrap(); // Mean charcoal ages of deposits.
-    let fg: Vec<f64> = dep.iter().filter(|x| x.facies == "FG").map(|x| x.age).collect(); // Mean gravel deposit ages.
-    let iat = Sample::read("/home/erik/data/iat.csv").unwrap(); // Mean inherited ages of charcoal in deposits.
-    let ia: Vec<f64> = iat.iter().map(|x| x.age).collect(); // Vector of inherited ages from all classes of deposits.
+    let dep = Sample::read("data/dep.csv").unwrap(); // Mean charcoal ages of deposits.
+    let fg: Vec<f64> = dep
+        .iter()
+        .filter(|x| x.facies == "FG")
+        .map(|x| x.age)
+        .collect(); // Mean gravel deposit ages.
 
     // Set model parameters.
     let model = ModelManager::new()
         .capture_gravels(0.0..1.0) // Range of gravel capture rates to model.
         .duration(10000) // Duration of timed() searches in hours.
+        .index(0..20000) // Range of years to fit transit time probabilities.
         .obs(&fg) // Observations to fit.
         .period(40000.0) // Time period of individual simulations in years.
         .range(1000) // Seed for rng for reproducibility.
-        .runs(200) // Number of times to run the model per sampling point.
-        .source_runs(500) // Number of times to run the model per gravel source.
+        .runs(10000) // Number of times to run the model per sampling point.
         .storage_gravels(0.0..1.0); // Range of gravel storage rates to model.
-
-    // Source deposits for gravels.
-    let debris_flows = Reservoir::new()
-        .input(&0.46).unwrap() // Input rate for debris-flow deposits from the Chi-squared test.
-        .output(&0.46).unwrap() // Output rate for fluvial removal of deposits from the Chi-squared test.
-        .inherit(&ia) // Inherited ages of charcoal in debris-flow deposits.
-        .model(&model); // Load model parameters.
 
     // Reservoir for gravel deposits.
     let fluvial = Fluvial::new()
-        .source(&debris_flows) // Set source as debris-flow deposits.
-        .turnover(&293.0) // Set turnover period from the Chi-squared test.
+        .source_from_csv("data/debris_flow_transits_ch.csv")
+        .unwrap() // Set source as debris-flow deposits.
+        .turnover(&318.0) // Set turnover period from the Chi-squared test.
         .manager(&model); // Load model parameters.
 
     // Fit model to observed deposit ages for specified duration.
     // Change directory path for user, panics on invalid path
-    fluvial.fit_rates_timed(&fg, "/home/erik/output/gravels_ch_200x_1000.csv").unwrap();
+
+    fluvial
+        .fit_rates_timed(&fg, "/home/erik/output/gravels_ch_10kx_1000.csv")
+        .unwrap();
 }
