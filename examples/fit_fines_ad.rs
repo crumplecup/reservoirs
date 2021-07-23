@@ -10,16 +10,17 @@ fn main() {
 
     // Set model parameters.
     let model = ModelManager::new()
-        .capture_fines(0.0..0.4) // Range of fines capture rates to model.
-        .capture_gravels(0.09..0.11) // Range of gravel capture rates to model, set to AD test.
+        .capture_fines(0.0..0.5) // Range of fines capture rates to model.
+        .capture_gravels(0.29..0.30) // Range of gravel capture rates to model, set to AD test.
         .duration(10000) // Duration of timed() searches in hours.
         .fines(true) // Fit for fines deposits.
+        .obs(&ff) // Observations to fit.
         .period(40000.0) // Time period of individual simulations in years.
         .range(1000) // Seed for rng for reproducibility.
-        .runs(30) // Number of times to run the model per sampling point.
-        .source_runs(1) // Number of times to run the model per gravel source.
-        .storage_fines(0.0..0.4) // Range of fines storage rates to model.
-        .storage_gravels(0.09..0.11); // Range of gravel storage rates to model, set to AD test.
+        .runs(200) // Number of times to run the model per sampling point.
+        .source_runs(100) // Number of times to run the model per gravel source.
+        .storage_fines(0.0..0.5) // Range of fines storage rates to model.
+        .storage_gravels(0.28..0.29); // Range of gravel storage rates to model, set to AD test.
 
     // Source deposits for gravels.
     let debris_flows = Reservoir::new()
@@ -30,11 +31,11 @@ fn main() {
 
     // Reservoir for gravel deposits.
     let fluvial = Fluvial::new()
-        .source(&[debris_flows.clone()]) // Set source as debris-flow deposits.
+        .source(&debris_flows) // Set source as debris-flow deposits.
         .turnover(&318.0) // Set turnover period from the Anderson-Darling test.
         .manager(&model); // Load model parameters.
 
     // Fit model to observed deposit ages for specified duration.
     // Change directory path for user, panics on invalid path
-    fluvial.fit_rates_timed(&ff, "/home/erik/output/fines_ad_40x_1000.csv").unwrap();
+    fluvial.fit_rates_timed(&ff, "/home/erik/output/fines_ad_20x_1000.csv").unwrap();
 }

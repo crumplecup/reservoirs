@@ -1075,7 +1075,7 @@ pub struct Fluvial {
     capture_rate_gravels: f64,
     manager: ModelManager,
     mass: Vec<f64>,
-    source: Vec<Reservoir>,
+    source: Vec<f64>,
     storage_rate_fines: f64,
     storage_rate_gravels: f64,
     turnover: f64,
@@ -1313,23 +1313,9 @@ impl Fluvial {
     /// Simulates removal from the reservoir over time based on the rate.
     pub fn sim(mut self) -> Self {
         let mut source_flux = Vec::new();
-        let model = self.manager.clone();
-        // let mut rng = self.source[0].range.clone();
-        for i in self.source.clone() {
-            let res = i.n_sim();
-            source_flux.extend(res);
-        }
-        if self.manager.fines {
-            let source_gravel = self.clone()
-                .manager(&model.fines(false))
-                .n_sim();
-            source_flux.extend(source_gravel);
-        }
-        let mut source = Vec::new();
         for _ in 0..self.manager.obs.len() {
-            source.push(source_flux[self.manager.range.gen_range(0..self.manager.obs.len())]);
+            source_flux.push(self.source[self.manager.range.gen_range(0..self.source.len())]);
         }
-        let mut source_flux = source;
         info!("Selection probability for storage.");
         let mut idx = Vec::new();
         let mut ps = Vec::new();
@@ -1360,9 +1346,19 @@ impl Fluvial {
     }
 
 
-    /// Sets source reservoirs.
-    pub fn source(mut self, source: &[Reservoir]) -> Self {
-        self.source = source.to_owned();
+    /// Sets source flux for reservoirs.
+    pub fn source(mut self, source: &Reservoir) -> Self {
+        let mut source_flux = Vec::new();
+        let model = self.manager.clone();
+        source_flux.extend(source.clone().n_sim());
+        if self.manager.fines {
+            self.source = source_flux.clone();
+            let source_gravel = self.clone()
+                .manager(&model.fines(false))
+                .n_sim();
+            source_flux.extend(source_gravel);
+        }
+        self.source = source_flux;
         self
     }
 
