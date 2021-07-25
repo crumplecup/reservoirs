@@ -911,6 +911,7 @@ pub struct ModelManager {
     fines: bool,
     index: std::ops::Range<i32>,
     obs: Vec<f64>,
+    obs_len: usize,
     period: f64,
     range: rand::rngs::StdRng,
     runs: usize,
@@ -931,6 +932,7 @@ impl ModelManager {
             fines: false,
             index: 0..1000,
             obs: Vec::new(),
+            obs_len: 0,
             period: 100.0,
             range: rand::SeedableRng::seed_from_u64(777),
             runs: 10,
@@ -985,6 +987,12 @@ impl ModelManager {
     /// Set period length of model runs.
     pub fn obs(mut self, obs: &[f64]) -> Self {
         self.obs = obs.to_owned();
+        self
+    }
+
+    /// Set number of observations to collect for representative sample.
+    pub fn obs_len(mut self, obs: &[f64]) -> Self {
+        self.obs_len = obs.len();
         self
     }
 
@@ -1346,7 +1354,7 @@ impl Fluvial {
             index.push(i as f64);
         }
         let mut source_flux = Vec::new();
-        for _ in 0..self.manager.obs.len() {
+        for _ in 0..self.manager.obs_len {
             source_flux.push(index[wts.sample(&mut self.manager.range)]);
         }
         info!("Selection probability for storage.");
