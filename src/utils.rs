@@ -22,7 +22,7 @@ pub fn ad_dual(sample: &[f64], other: &[f64]) -> f64 {
     let mut adi = Vec::new();
 
     for (i, val) in ad_i.iter().take(k - 1).enumerate() {
-        let step = (1.0 / (lnx * lny) as f64) * f64::powi((k as f64 * val) - (lnx * (i + 1)) as f64, 2)
+        let step = f64::powi((k as f64 * val) - (lnx * (i + 1)) as f64, 2)
             / ((i + 1) * (k - (i + 1))) as f64;
         adi.push(step);
     }

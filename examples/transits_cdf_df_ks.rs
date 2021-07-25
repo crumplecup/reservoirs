@@ -7,7 +7,7 @@ fn main() {
     let fg: Vec<f64> = dep
         .iter()
         .filter(|x| x.facies == "FG")
-        .map(|x| x.age)
+        .map(|x| x.age + 50.0)
         .collect(); // Mean gravel deposit ages.
     let iat = Sample::read("data/iat.csv").unwrap(); // Mean inherited ages of charcoal in deposits.
     let ia: Vec<f64> = iat.iter().map(|x| x.age).collect(); // Vector of inherited ages from all classes of deposits.
