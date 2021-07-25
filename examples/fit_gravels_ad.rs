@@ -17,13 +17,13 @@ fn main() {
         .index(0..20000) // Range of years to fit transit time probabilities.
         .obs(&fg) // Observations to fit.
         .period(40000.0) // Time period of individual simulations in years.
-        .range(1000) // Seed for rng for reproducibility.
+        .range(1002) // Seed for rng for reproducibility.
         .runs(10000) // Number of times to run the model per sampling point.
         .storage_gravels(0.0..1.0); // Range of gravel storage rates to model.
 
     // Reservoir for gravel deposits.
     let fluvial = Fluvial::new()
-        .source_from_csv("data/debris_flow_transits_ad.csv")
+        .source_from_csv("data/debris_flow_deposits_cdf.csv")
         .unwrap() // Set source as debris-flow deposits.
         .turnover(&318.0) // Set turnover period from the Anderson-Darling test.
         .manager(&model); // Load model parameters.
@@ -32,6 +32,6 @@ fn main() {
     // Change directory path for user, panics on invalid path
 
     fluvial
-        .fit_rates_timed(&fg, "/home/erik/output/gravels_ad_10kx_1000.csv")
+        .fit_rates_timed(&fg, "/home/erik/output/gravels_ad_10kx_1002.csv")
         .unwrap();
 }

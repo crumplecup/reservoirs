@@ -1422,7 +1422,7 @@ impl Fluvial {
             .clone()
             .manager
             .seed_clones()
-            .iter()
+            .par_iter()
             .map(|x| self.clone().manager(x).sim())
             .collect::<Vec<Fluvial>>();
 

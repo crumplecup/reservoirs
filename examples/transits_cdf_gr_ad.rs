@@ -16,7 +16,7 @@ fn main() {
         .obs(&fg) // Observations to fit.
         .period(40000.0) // Time period of individual simulations in years.
         .range(777) // Seed for rng for reproducibility.
-        .runs(100); // Number of times to run the model per sampling point.
+        .runs(10000); // Number of times to run the model per sampling point.
 
     // Reservoir for gravel deposits.
     let fluvial = Fluvial::new()

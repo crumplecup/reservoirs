@@ -23,9 +23,9 @@ fn main() {
 
     // Reservoir for gravel deposits.
     let fluvial = Fluvial::new()
-        .source_from_csv("data/debris_flow_transits_ch.csv")
+        .source_from_csv("data/debris_flow_deposits_cdf.csv")
         .unwrap() // Set source as debris-flow deposits.
-        .turnover(&318.0) // Set turnover period from the Chi-squared test.
+        .turnover(&293.0) // Set turnover period from the Chi-squared test.
         .manager(&model); // Load model parameters.
 
     // Fit model to observed deposit ages for specified duration.
