@@ -1,5 +1,7 @@
 use reservoirs::prelude::*;
-/// Produces a csv file of model fit to observed deposit ages using the Kolmogorov-Smirnov test.
+
+
+/// Produces a csv file of model fit to observed deposit ages.
 fn main() {
     // Load charcoal age data.
     // Change directory path for user, panics on invalid path
@@ -17,27 +19,32 @@ fn main() {
 
     // Set model parameters.
     let model = ModelManager::new()
-        .capture_gravels(0.1..0.4) // Range of gravel capture rates to model.
-        .duration(10000) // Duration of timed() searches in hours.
         .index(0..20000) // Range of years to fit transit time probabilities.
         .obs(&fg) // Observations to fit.
         .obs_len(&df) // Number of samples to collect from source.
         .period(40000.0) // Time period of individual simulations in years.
-        .range(1000) // Seed for rng for reproducibility.
-        .runs(1000) // Number of times to run the model per sampling point.
-        .storage_gravels(0.0..0.5); // Range of gravel storage rates to model.
+        .range(777) // Seed for rng for reproducibility.
+        .runs(1); // Number of times to run the model per sampling point.
+
 
     // Reservoir for gravel deposits.
     let fluvial = Fluvial::new()
-        .source_from_csv("data/debris_flow_transits_ks.csv")
+        .source_from_csv("data/debris_flow_transits_kp.csv")
         .unwrap() // Set source as debris-flow deposits.
-        .turnover(&208.0) // Set turnover period from the Kolmogorov-Smirnov test.
-        .manager(&model); // Load model parameters.
+        .capture_rate_gravels(0.1545228)
+        .storage_rate_gravels(0.07673023)
+        .turnover(&244.2915)
+        .manager(&model.clone()); // Load model parameters.
 
-    // Fit model to observed deposit ages for specified duration.
-    // Change directory path for user, panics on invalid path
-
-    fluvial
-        .fit_rates_timed(&fg, "/home/erik/output/gravels_ks_1kx_1000.csv")
-        .unwrap();
+    let mut max = rand_distr::num_traits::Float::max_value();
+    let mut best = Vec::new();
+    for i in 0..10000 {
+        let fit = fluvial.clone().manager(&model.clone().range(i)).transit_times();
+        let gof = utils::gof(&fit, &fg);
+        if gof[4] < max {
+            best = fit;
+            max = gof[4];
+        }
+    }
+    utils::record(&mut best, "/home/erik/output/stereotype_gravels_kp.csv").unwrap();
 }

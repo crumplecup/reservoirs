@@ -17,27 +17,22 @@ fn main() {
 
     // Set model parameters.
     let model = ModelManager::new()
-        .capture_gravels(0.1..0.4) // Range of gravel capture rates to model.
-        .duration(10000) // Duration of timed() searches in hours.
         .index(0..20000) // Range of years to fit transit time probabilities.
         .obs(&fg) // Observations to fit.
         .obs_len(&df) // Number of samples to collect from source.
         .period(40000.0) // Time period of individual simulations in years.
-        .range(1000) // Seed for rng for reproducibility.
-        .runs(1000) // Number of times to run the model per sampling point.
-        .storage_gravels(0.0..0.5); // Range of gravel storage rates to model.
+        .range(777) // Seed for rng for reproducibility.
+        .runs(10000); // Number of times to run the model per sampling point.
 
     // Reservoir for gravel deposits.
     let fluvial = Fluvial::new()
         .source_from_csv("data/debris_flow_transits_ks.csv")
         .unwrap() // Set source as debris-flow deposits.
+        .capture_rate_gravels(0.162)
+        .storage_rate_gravels(0.130)
         .turnover(&208.0) // Set turnover period from the Kolmogorov-Smirnov test.
         .manager(&model); // Load model parameters.
 
-    // Fit model to observed deposit ages for specified duration.
-    // Change directory path for user, panics on invalid path
-
-    fluvial
-        .fit_rates_timed(&fg, "/home/erik/output/gravels_ks_1kx_1000.csv")
-        .unwrap();
+    let mut rec = fluvial.transit_times();
+    utils::record(&mut rec, "/home/erik/output/transits_cdf_gr_ks.csv").unwrap();
 }

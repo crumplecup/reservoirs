@@ -1,5 +1,5 @@
 use reservoirs::prelude::*;
-/// Produces a csv file of model fit to observed deposit ages using the Kolmogorov-Smirnov test.
+/// Produces a csv file of model fit to observed deposit ages using the Anderson-Darling test.
 fn main() {
     // Load charcoal age data.
     // Change directory path for user, panics on invalid path
