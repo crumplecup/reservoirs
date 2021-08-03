@@ -36,11 +36,10 @@ fn main() {
         .turnover(&309.6175) // Set turnover period from the Kolmogorov-Smirnov test.
         .manager(&model.clone()); // Load model parameters.
 
-    let mut fit = Vec::new();
     let mut max = rand_distr::num_traits::Float::max_value();
     let mut best = Vec::new();
     for i in 0..10000 {
-        fit = fluvial.clone().manager(&model.clone().range(i)).transit_times();
+        let fit = fluvial.clone().manager(&model.clone().range(i)).transit_times();
         let gof = utils::gof(&fit, &fg);
         if gof[4] < max {
             best = fit;
