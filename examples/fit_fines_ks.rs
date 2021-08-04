@@ -27,7 +27,7 @@ fn main() {
         .storage_gravels(0.28..0.29); // Range of gravel storage rates to model, set to KS test.
 
     // Source deposits for gravels.
-    let debris_flows = Reservoir::new()
+    let _debris_flows = Reservoir::new()
         .input(&0.89)
         .unwrap() // Input rate for debris-flow deposits from the Kolmogorov-Smirnov test.
         .output(&0.89)
@@ -37,7 +37,7 @@ fn main() {
 
     // Reservoir for gravel deposits.
     let fluvial = Fluvial::new()
-        .source(&debris_flows) // Set source as debris-flow deposits.
+        // .source(&debris_flows) // Set source as debris-flow deposits.
         .turnover(&208.0) // Set turnover period from the Kolmogorov-Smirnov test.
         .manager(&model); // Load model parameters.
 

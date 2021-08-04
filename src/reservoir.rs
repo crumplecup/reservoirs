@@ -1519,8 +1519,9 @@ impl Fluvial {
     }
 
     /// Sets source flux for reservoirs.
-    pub fn source(mut self, source: &Reservoir) -> Self {
-        let source_flux = source.clone().transit_times();
+    pub fn source(mut self, source: Vec<f64>) -> Self {
+        let source_flux = utils::cdf_rng(&source, &self.manager.index);
+        // let source_flux = source.clone().transit_times();
 
         // if self.manager.fines {
         //     let source_gravel = source.model(&model.fines(false)).transit_times();

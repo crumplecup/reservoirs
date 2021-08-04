@@ -22,7 +22,7 @@ fn main() {
         .source_runs(1); // Number of times to run the model per gravel source.
 
     // Source deposits for gravels.
-    let debris_flows = Reservoir::new()
+    let _debris_flows = Reservoir::new()
         .input(&0.35)
         .unwrap() // Input rate for debris-flow deposits from the Anderson-Darling test.
         .output(&0.35)
@@ -32,7 +32,7 @@ fn main() {
 
     // Reservoir for gravel deposits.
     let fluvial = Fluvial::new()
-        .source(&debris_flows) // Set source as debris-flow deposits.
+        // .source(&debris_flows) // Set source as debris-flow deposits.
         .turnover(&318.0) // Set turnover period from the Anderson-Darling test.
         .manager(&model); // Load model parameters.
 

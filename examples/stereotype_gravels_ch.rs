@@ -23,8 +23,8 @@ fn main() {
         .obs(&fg) // Observations to fit.
         .obs_len(&df) // Number of samples to collect from source.
         .period(40000.0) // Time period of individual simulations in years.
-        .range(777) // Seed for rng for reproducibility.
-        .runs(10000); // Number of times to run the model per sampling point.
+        .range(1003) // Seed for rng for reproducibility.
+        .runs(100000); // Number of times to run the model per sampling point.
 
 
     // Reservoir for gravel deposits.
@@ -34,11 +34,11 @@ fn main() {
         // .capture_rate_gravels(0.3421237)
         // .storage_rate_gravels(0.02205183)
         // .turnover(&306.3833)
-        .capture_rate_gravels(0.1867216)
-        .storage_rate_gravels(0.1223394)
+        .capture_rate_gravels(0.2899986)
+        .storage_rate_gravels(0.09000133)
         .turnover(&293.0)
         .manager(&model.clone()); // Load model parameters.
 
     let mut rec = fluvial.cherry_pick();
-    utils::record(&mut rec, "/home/erik/output/stereotype_gravels_ch3.csv").unwrap();
+    utils::record(&mut rec, "/home/erik/output/stereotype_gravels_ch4.csv").unwrap();
 }
