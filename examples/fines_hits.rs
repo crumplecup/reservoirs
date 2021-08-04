@@ -31,17 +31,17 @@ fn main() {
         .duration(10000)
         .index(0..20000) // Range of years to fit transit time probabilities.
         .obs(&ff) // Observations to fit.
-        .obs_len(&source_flux) // Number of samples to collect from source.
+        .obs_len(&ff) // Number of samples to collect from source.
         .period(40000.0) // Time period of individual simulations in years.
         .range(1000) // Seed for rng for reproducibility.
-        .thresholds(5.5, 14800.0, 0.33, 0.29)
+        .thresholds(4.0, 350.0, 0.33, 0.29)
         .runs(200); // Number of times to run the model per sampling point.
 
 
 
     // Reservoir for gravel deposits.
     let fluvial = Fluvial::new()
-        .source(df)
+        .source(fg)
         // .unwrap() // Set source as debris-flow deposits.
         // .capture_rate_gravels(0.1867216)
         .capture_rate_gravels(0.3285686)

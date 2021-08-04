@@ -23,7 +23,7 @@ fn main() {
         .obs(&fg) // Observations to fit.
         .obs_len(&df) // Number of samples to collect from source.
         .period(40000.0) // Time period of individual simulations in years.
-        .range(1010) // Seed for rng for reproducibility.
+        .range(1001) // Seed for rng for reproducibility.
         .runs(100000); // Number of times to run the model per sampling point.
 
 
@@ -31,11 +31,11 @@ fn main() {
     let fluvial = Fluvial::new()
         .source_from_csv("data/debris_flow_transits_kp.csv")
         .unwrap() // Set source as debris-flow deposits.
-        .capture_rate_gravels(0.06999974)
-        .storage_rate_gravels(0.8899935)
+        .capture_rate_gravels(0.03382391)
+        .storage_rate_gravels(0.1655014)
         .turnover(&191.0)
         .manager(&model.clone()); // Load model parameters.
 
     let mut rec = fluvial.cherry_pick();
-    utils::record(&mut rec, "/home/erik/output/stereotype_gravels_kp1.csv").unwrap();
+    utils::record(&mut rec, "/home/erik/output/stereotype_gravels_kp4.csv").unwrap();
 }

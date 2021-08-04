@@ -31,7 +31,7 @@ fn main() {
         .duration(10000)
         .index(0..20000) // Range of years to fit transit time probabilities.
         .obs(&fg) // Observations to fit.
-        .obs_len(&df) // Number of samples to collect from source.
+        .obs_len(&fg) // Number of samples to collect from source.
         .period(40000.0) // Time period of individual simulations in years.
         .range(1000) // Seed for rng for reproducibility.
         .thresholds(5.0, 800.0, 0.29, 0.25)
