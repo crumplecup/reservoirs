@@ -24,7 +24,9 @@ fn main() {
 
     let mut source_flux = df.to_vec();
     let mut flux = fg.to_vec();
+    let mut more = fg.to_vec();
     source_flux.append(&mut flux);
+    source_flux.append(&mut more);
 
     // Set model parameters.
     let model = ModelManager::new()
@@ -33,7 +35,7 @@ fn main() {
         .obs(&ff) // Observations to fit.
         .obs_len(&ff) // Number of samples to collect from source.
         .period(40000.0) // Time period of individual simulations in years.
-        .range(1001) // Seed for rng for reproducibility.
+        .range(1000) // Seed for rng for reproducibility.
         .thresholds(4.0, 350.0, 0.33, 0.29)
         .runs(200); // Number of times to run the model per sampling point.
 
@@ -51,5 +53,5 @@ fn main() {
         .turnover(&309.6175) // Set turnover period from the Kolmogorov-Smirnov test.
         .manager(&model.clone()); // Load model parameters.
 
-    fluvial.hit_rates_timed("/home/erik/output/fines_hits_200_1001.csv").unwrap();
+    fluvial.hit_rates_timed("/home/erik/output/fines_hits_200_1000.csv").unwrap();
 }
