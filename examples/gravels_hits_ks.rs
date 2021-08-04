@@ -19,6 +19,7 @@ fn main() {
 
     // Set model parameters.
     let model = ModelManager::new()
+        .duration(10000)
         .index(0..20000) // Range of years to fit transit time probabilities.
         .obs(&fg) // Observations to fit.
         .obs_len(&df) // Number of samples to collect from source.
