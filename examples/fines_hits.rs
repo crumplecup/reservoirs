@@ -33,7 +33,7 @@ fn main() {
         .obs(&ff) // Observations to fit.
         .obs_len(&ff) // Number of samples to collect from source.
         .period(40000.0) // Time period of individual simulations in years.
-        .range(1000) // Seed for rng for reproducibility.
+        .range(1001) // Seed for rng for reproducibility.
         .thresholds(4.0, 350.0, 0.33, 0.29)
         .runs(200); // Number of times to run the model per sampling point.
 
@@ -41,7 +41,8 @@ fn main() {
 
     // Reservoir for gravel deposits.
     let fluvial = Fluvial::new()
-        .source(fg)
+        .source(source_flux)
+        // .source_from_csv("data/gravels_transits_ks.csv")
         // .unwrap() // Set source as debris-flow deposits.
         // .capture_rate_gravels(0.1867216)
         .capture_rate_gravels(0.3285686)
@@ -50,5 +51,5 @@ fn main() {
         .turnover(&309.6175) // Set turnover period from the Kolmogorov-Smirnov test.
         .manager(&model.clone()); // Load model parameters.
 
-    fluvial.hit_rates_timed("/home/erik/output/fines_hits_200_1000.csv").unwrap();
+    fluvial.hit_rates_timed("/home/erik/output/fines_hits_200_1001.csv").unwrap();
 }
