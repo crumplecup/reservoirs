@@ -1,7 +1,7 @@
 use reservoirs::prelude::*;
 
 
-/// Produces a csv file of model fit to observed deposit ages.
+/// Produces a csv file of model fit to observed deposit ages using the Kolmogorov-Smirnov test.
 fn main() {
     // Load charcoal age data.
     // Change directory path for user, panics on invalid path
@@ -23,21 +23,21 @@ fn main() {
         .obs(&fg) // Observations to fit.
         .obs_len(&df) // Number of samples to collect from source.
         .period(40000.0) // Time period of individual simulations in years.
-        .range(777) // Seed for rng for reproducibility.
-        .runs(10000); // Number of times to run the model per sampling point.
+        .range(1000) // Seed for rng for reproducibility.
+        .thresholds(1.0, 450.0, 0.19, 0.13)
+        .runs(200); // Number of times to run the model per sampling point.
 
 
     // Reservoir for gravel deposits.
     let fluvial = Fluvial::new()
-        .source_from_csv("data/debris_flow_transits_ad.csv")
+        .source_from_csv("data/debris_flow_transits_ks.csv")
         .unwrap() // Set source as debris-flow deposits.
-        // .capture_rate_gravels(0.00196387)
-        .capture_rate_gravels(0.1857167)
-        // .storage_rate_gravels(0.3831147)
-        .storage_rate_gravels(0.1285943)
-        .turnover(&318.00)
+        // .capture_rate_gravels(0.1867216)
+        .capture_rate_gravels(0.3285686)
+        // .storage_rate_gravels(0.1223394)
+        .storage_rate_gravels(0.957134)
+        .turnover(&309.6175) // Set turnover period from the Kolmogorov-Smirnov test.
         .manager(&model.clone()); // Load model parameters.
 
-    let mut rec = fluvial.cherry_pick();
-    utils::record(&mut rec, "/home/erik/output/stereotype_gravels_ad2.csv").unwrap();
+    fluvial.hit_rates_timed("/home/erik/output/gravel_hits_ks_200_1000.csv").unwrap();
 }

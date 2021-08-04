@@ -16,8 +16,7 @@ pub fn ad_dual(sample: &[f64], other: &[f64]) -> f64 {
     let k = lnx + lny;
     let mut ad_i = Vec::new();
     for i in x {
-        let step: Vec<f64> = sample.iter().filter(|z| **z <= i).map(|z| *z).collect();
-        ad_i.push(step.len() as f64);
+        ad_i.push(sample.iter().filter(|z| **z <= i).count() as f64);
     }
     let mut adi = Vec::new();
 
@@ -51,9 +50,8 @@ pub fn cdf(x: &[f64]) -> Vec<(f64, f64)> {
     cx.dedup();
     let mut cdf = Vec::new();
     for i in cx {
-        let num: Vec<&f64> = x.iter().filter(|x| **x <= i).collect();
-        let res = num.len() as f64 / ln;
-        cdf.push((i, res));
+        let num = x.iter().filter(|x| **x <= i).count() as f64 / ln;
+        cdf.push((i, num));
     }
     cdf
 }
@@ -96,11 +94,9 @@ pub fn cdf_dual(obs: &[f64], other: &[f64]) -> Vec<(f64, f64)> {
     // construct cdf of each
     let mut cdf = Vec::new();
     for i in x {
-        let numx: Vec<&f64> = xo.iter().filter(|z| **z <= i).collect();
-        let numy: Vec<&f64> = yo.iter().filter(|z| **z <= i).collect();
-        let resx = numx.len() as f64 / lnx;
-        let resy = numy.len() as f64 / lny;
-        cdf.push((resx, resy));
+        let numx = xo.iter().filter(|z| **z <= i).count() as f64 / lnx;
+        let numy = yo.iter().filter(|z| **z <= i).count() as f64 / lny;
+        cdf.push((numx, numy));
     }
     cdf
 }
@@ -212,6 +208,29 @@ pub fn cdf_rng(obs: &[f64], range: &std::ops::Range<i32>) -> Vec<f64> {
     cdf_rng
 }
 
+/// Chi-squared goodness-of-fit test.
+pub fn chi_squared(obs: &[f64], other: &[f64]) -> f64 {
+    // join the two vectors, sort and deduplicate
+    let mut x = obs.to_vec();
+    let mut y = other.to_vec();
+    let xo = x.clone(); // clone the originals for later use
+    let yo = y.clone();
+    x.append(&mut y);
+    x.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    x.dedup();
+    // construct cdf of each
+    let mut difs = Vec::new();
+    for i in x {
+        let numx = xo.iter().filter(|z| **z <= i).count() as f64;
+        let numy = yo.iter().filter(|z| **z <= i).count() as f64;
+        if numy > 0.0 {
+            difs.push(f64::powi(numx - numy, 2) / numy);
+        }
+    }
+    difs.iter().sum::<f64>()
+}
+
+
 /// Convolve frequency distributions along an index of values.
 ///
 /// # Examples
@@ -313,11 +332,12 @@ pub fn gof(obs: &[f64], other: &[f64]) -> Vec<f64> {
     let k = lnx + lny;
     let ada = (2.492 - 1.0) * (1.0 - (1.55 / k as f64)) + 1.0;
     // chi-squared pearsons test
-    let ch = cdf
-        .iter()
-        .filter(|x| x.0 > 0.0)
-        .map(|x| f64::powi(x.1 - x.0, 2) / x.0)
-        .sum::<f64>();
+    let ch = chi_squared(obs, other);
+    // let ch = cdf
+    //     .iter()
+    //     .filter(|x| x.0 > 0.0)
+    //     .map(|x| f64::powi(x.1 - x.0, 2) / x.0)
+    //     .sum::<f64>();
     // kuiper test
     let kp1 = cdf.iter().map(|x| x.0 - x.1).fold(0.0, f64::max);
     let kp2 = cdf.iter().map(|x| x.1 - x.0).fold(0.0, f64::max);

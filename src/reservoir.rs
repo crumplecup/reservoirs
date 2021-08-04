@@ -918,6 +918,8 @@ pub struct ModelManager {
     source_runs: usize,
     storage_gravels: std::ops::Range<f64>,
     storage_fines: std::ops::Range<f64>,
+    thresholds: Thresholds,
+    turnover: std::ops::Range<f64>,
 }
 
 /// Methods for modeling.
@@ -939,6 +941,8 @@ impl ModelManager {
             source_runs: 10,
             storage_fines: 0.0..1.0,
             storage_gravels: 0.0..1.0,
+            thresholds: Thresholds::new(0.0, 0.0, 0.0, 0.0),
+            turnover: 200.0..300.0,
         }
     }
 
@@ -1030,6 +1034,18 @@ impl ModelManager {
         self.storage_gravels = storage_gravels;
         self
     }
+
+    /// Set statistical thresholds for goodness-of-fit tests.
+    pub fn thresholds(mut self, ad: f64, ch: f64, kp: f64, ks: f64) -> Self {
+        self.thresholds = Thresholds::new(ad, ch, kp, ks);
+        self
+    }
+
+    /// Set the range of turnover periods for sediment storage.
+    pub fn turnover(mut self, turnover: std::ops::Range<f64>) -> Self {
+        self.turnover = turnover;
+        self
+    }
 }
 
 impl Default for ModelManager {
@@ -1045,6 +1061,7 @@ pub struct FluvialFit {
     capture_rate_gravels: f64,
     storage_rate_fines: f64,
     storage_rate_gravels: f64,
+    turnover: f64,
     ad1: f64,
     ad2: f64,
     ch: f64,
@@ -1106,6 +1123,111 @@ impl Fluvial {
         }
     }
 
+    /// Cherry pick the closest fit to an observed distribution.
+    pub fn cherry_pick(self) -> Vec<f64> {
+        let sims = self
+            .clone()
+            .manager
+            .seed_clones()
+            .par_iter()
+            .map(|x| self.clone().manager(x).sim())
+            .collect::<Vec<Fluvial>>();
+        let fit = sims.par_iter().map(|s| s.clone().gof(&self.manager.obs)).collect::<Vec<Vec<f64>>>();
+        let min_ks = fit.iter().map(|f| f[4]).fold(f64::INFINITY, |a, b| a.min(b));
+        let min_id = fit.par_iter().enumerate().filter(|(_,val)| (val[4] - min_ks) < 0.0001).map(|(i, _)| i).collect::<Vec<usize>>();
+        sims[min_id[0]].clone().mass
+    }
+
+    /// Hit rate for statistical thresholds.
+    pub fn hit_rate(self) -> Vec<f64> {
+        let sims = self
+            .clone()
+            .manager
+            .seed_clones()
+            .par_iter()
+            .map(|x| self.clone().manager(x).sim())
+            .collect::<Vec<Fluvial>>();
+        let fit = sims.par_iter().map(|s| s.clone().gof(&self.manager.obs)).collect::<Vec<Vec<f64>>>();
+        let hit_ad = fit.par_iter().filter(|f| f[0] <= self.manager.thresholds.ad).count() as f64 / self.manager.runs as f64;
+        let hit_ch = fit.par_iter().filter(|f| f[2] <= self.manager.thresholds.ch).count() as f64 / self.manager.runs as f64;
+        let hit_kp = fit.par_iter().filter(|f| f[3] <= self.manager.thresholds.kp).count() as f64 / self.manager.runs as f64;
+        let hit_ks = fit.par_iter().filter(|f| f[4] <= self.manager.thresholds.ks).count() as f64 / self.manager.runs as f64;
+        vec![hit_ad, hit_ch, hit_kp, hit_ks]
+    }
+
+    /// Fits a given flux probability and storage rate to an empiric record.
+    pub fn hit_rates(mut self) -> FluvialFit {
+        let capture_fines = rand::distributions::Uniform::from(self.manager.capture_fines.clone());
+        let capture_rate_fines = capture_fines.sample(&mut self.manager.range);
+        let capture_gravels =
+            rand::distributions::Uniform::from(self.manager.capture_gravels.clone());
+        let capture_rate_gravels = capture_gravels.sample(&mut self.manager.range);
+        let storage_fines = rand::distributions::Uniform::from(self.manager.storage_fines.clone());
+        let storage_rate_fines = storage_fines.sample(&mut self.manager.range);
+        let storage_gravels =
+            rand::distributions::Uniform::from(self.manager.storage_gravels.clone());
+        let storage_rate_gravels = storage_gravels.sample(&mut self.manager.range);
+        let turnover_range = rand::distributions::Uniform::from(self.manager.turnover.clone());
+        let turnover = turnover_range.sample(&mut self.manager.range);
+
+        let fit = self
+            .capture_rate_fines(capture_rate_fines)
+            .capture_rate_gravels(capture_rate_gravels)
+            .storage_rate_fines(storage_rate_fines)
+            .storage_rate_gravels(storage_rate_gravels)
+            .turnover(&turnover)
+            .hit_rate();
+        FluvialFit {
+            capture_rate_fines,
+            capture_rate_gravels,
+            storage_rate_fines,
+            storage_rate_gravels,
+            turnover,
+            ad1: fit[0],
+            ad2: 0.0,
+            ch: fit[1],
+            kp: fit[2],
+            ks1: fit[3],
+            ks2: 0.0,
+        }
+    }
+
+    /// Run fit_rates() for a set duration.
+    pub fn hit_rates_timed(
+        mut self,
+        path: &str,
+    ) -> Result<Vec<FluvialFit>, errors::ResError> {
+        let seeder: rand::distributions::Uniform<u64> =
+            rand::distributions::Uniform::new(0, 10000000);
+
+        let dur = std::time::Duration::new(60 * 60 * self.manager.duration, 0);
+        let now = std::time::SystemTime::now();
+        let mut rec = Vec::new();
+        let exists = std::path::Path::new(path).exists();
+        match exists {
+            true => {
+                let mut stats: Vec<FluvialFit> = FluvialFit::read(path)?;
+                rec.append(&mut stats);
+            }
+            false => {}
+        }
+        while std::time::SystemTime::now() < now + dur {
+            let mut fit = self.clone();
+            fit.manager = fit
+                .manager
+                .range(seeder.sample(&mut self.manager.range))
+                .clone();
+            let new = fit.hit_rates();
+            {
+                rec.push(new);
+            }
+            FluvialFit::record(&mut rec, path)?;
+        }
+        Ok(rec)
+    }
+
+
+
     /// Fit number of runs to gof tests and return mean of each.
     pub fn fit(self, other: &[f64]) -> Vec<f64> {
         let mut rng = self.manager.range.clone();
@@ -1159,18 +1281,22 @@ impl Fluvial {
         let storage_gravels =
             rand::distributions::Uniform::from(self.manager.storage_gravels.clone());
         let storage_rate_gravels = storage_gravels.sample(&mut self.manager.range);
+        let turnover_range = rand::distributions::Uniform::from(self.manager.turnover.clone());
+        let turnover = turnover_range.sample(&mut self.manager.range);
 
         let fit = self
             .capture_rate_fines(capture_rate_fines)
             .capture_rate_gravels(capture_rate_gravels)
             .storage_rate_fines(storage_rate_fines)
             .storage_rate_gravels(storage_rate_gravels)
+            .turnover(&turnover)
             .fit(other);
         FluvialFit {
             capture_rate_fines,
             capture_rate_gravels,
             storage_rate_fines,
             storage_rate_gravels,
+            turnover,
             ad1: fit[1],
             ad2: fit[0],
             ch: fit[2],
@@ -1887,6 +2013,28 @@ impl Sample {
             record.push(row);
         }
         Ok(record)
+    }
+}
+
+
+/// Thresholds for statistical tests.
+#[derive(Clone, Debug)]
+pub struct Thresholds {
+    ad: f64,
+    ch: f64,
+    kp: f64,
+    ks: f64,
+}
+
+impl Thresholds {
+    /// Builder for threshold struct.
+    pub fn new(ad: f64, ch: f64, kp: f64, ks: f64) -> Thresholds {
+        Thresholds {
+            ad,
+            ch,
+            kp,
+            ks,
+        }
     }
 }
 

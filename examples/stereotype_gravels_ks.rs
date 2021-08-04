@@ -24,27 +24,20 @@ fn main() {
         .obs_len(&df) // Number of samples to collect from source.
         .period(40000.0) // Time period of individual simulations in years.
         .range(777) // Seed for rng for reproducibility.
-        .runs(1); // Number of times to run the model per sampling point.
+        .runs(10000); // Number of times to run the model per sampling point.
 
 
     // Reservoir for gravel deposits.
     let fluvial = Fluvial::new()
         .source_from_csv("data/debris_flow_transits_ks.csv")
         .unwrap() // Set source as debris-flow deposits.
-        .capture_rate_gravels(0.1867216)
-        .storage_rate_gravels(0.1223394)
+        // .capture_rate_gravels(0.1867216)
+        .capture_rate_gravels(0.3285686)
+        // .storage_rate_gravels(0.1223394)
+        .storage_rate_gravels(0.957134)
         .turnover(&309.6175) // Set turnover period from the Kolmogorov-Smirnov test.
         .manager(&model.clone()); // Load model parameters.
 
-    let mut max = rand_distr::num_traits::Float::max_value();
-    let mut best = Vec::new();
-    for i in 0..10000 {
-        let fit = fluvial.clone().manager(&model.clone().range(i)).transit_times();
-        let gof = utils::gof(&fit, &fg);
-        if gof[4] < max {
-            best = fit;
-            max = gof[4];
-        }
-    }
-    utils::record(&mut best, "/home/erik/output/stereotype_gravels_ks.csv").unwrap();
+    let mut rec = fluvial.cherry_pick();
+    utils::record(&mut rec, "/home/erik/output/stereotype_gravels_ks1.csv").unwrap();
 }
