@@ -23,7 +23,8 @@ fn main() {
         .obs(&fg) // Observations to fit.
         .obs_len(&fg) // Number of samples to collect from source.
         .period(40000.0) // Time period of individual simulations in years.
-        .range(1009) // Seed for rng for reproducibility.
+        // .range(1006) // Seed for rng for reproducibility.
+        .range(1006) // Seed for rng for reproducibility.
         .runs(100000); // Number of times to run the model per sampling point.
 
 
@@ -32,11 +33,10 @@ fn main() {
         // .source(df)
         .source_from_csv("data/debris_flow_transits_ch.csv")
         .unwrap() // Set source as debris-flow deposits.
-        // .capture_rate_gravels(0.3421237)
-        // .storage_rate_gravels(0.02205183)
-        // .turnover(&306.3833)
-        .capture_rate_gravels(0.1128788)
-        .storage_rate_gravels(0.1959933)
+        // .capture_rate_gravels(0.08333428)
+        // .storage_rate_gravels(0.08335321)
+        .capture_rate_gravels(0.118)
+        .storage_rate_gravels(0.136)
         .turnover(&293.0)
         .manager(&model.clone()); // Load model parameters.
 

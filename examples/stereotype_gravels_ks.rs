@@ -23,7 +23,7 @@ fn main() {
         .obs(&fg) // Observations to fit.
         .obs_len(&fg) // Number of samples to collect from source.
         .period(40000.0) // Time period of individual simulations in years.
-        .range(1000) // Seed for rng for reproducibility.
+        .range(1002) // Seed for rng for reproducibility.
         .runs(100000); // Number of times to run the model per sampling point.
 
 
@@ -32,9 +32,9 @@ fn main() {
         .source_from_csv("data/debris_flow_transits_ks.csv")
         .unwrap() // Set source as debris-flow deposits.
         // .capture_rate_gravels(0.1867216)
-        .capture_rate_gravels(0.1899991)
+        .capture_rate_gravels(0.1833595)
         // .storage_rate_gravels(0.1223394)
-        .storage_rate_gravels(0.1100011)
+        .storage_rate_gravels(0.1166756)
         .turnover(&208.0) // Set turnover period from the Kolmogorov-Smirnov test.
         .manager(&model.clone()); // Load model parameters.
 

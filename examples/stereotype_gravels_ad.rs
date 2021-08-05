@@ -32,9 +32,7 @@ fn main() {
         // .source(df)
         .source_from_csv("data/debris_flow_transits_ad.csv")
         .unwrap() // Set source as debris-flow deposits.
-        // .capture_rate_gravels(0.00196387)
         .capture_rate_gravels(0.07552229)
-        // .storage_rate_gravels(0.3831147)
         .storage_rate_gravels(0.06353204)
         .turnover(&318.00)
         .manager(&model); // Load model parameters.

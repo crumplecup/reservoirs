@@ -33,7 +33,7 @@ fn main() {
         .obs(&fg) // Observations to fit.
         .obs_len(&fg) // Number of samples to collect from source.
         .period(40000.0) // Time period of individual simulations in years.
-        .range(1000) // Seed for rng for reproducibility.
+        .range(1001) // Seed for rng for reproducibility.
         .thresholds(1.5, 300.0, 0.24, 0.15)
         .runs(200); // Number of times to run the model per sampling point.
 
@@ -51,5 +51,5 @@ fn main() {
         .turnover(&309.6175) // Set turnover period from the Kolmogorov-Smirnov test.
         .manager(&model.clone()); // Load model parameters.
 
-    fluvial.hit_rates_timed("/home/erik/output/gravel_hits_ch_1000.csv").unwrap();
+    fluvial.hit_rates_timed("/home/erik/output/gravel_hits_ch_1001.csv").unwrap();
 }
