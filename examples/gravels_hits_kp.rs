@@ -11,11 +11,20 @@ fn main() {
         .filter(|x| x.facies == "FG")
         .map(|x| x.age + 50.0)
         .collect(); // Mean gravel deposit ages.
+    let _ff: Vec<f64> = dep
+        .iter()
+        .filter(|x| x.facies == "FF")
+        .map(|x| x.age + 50.0)
+        .collect(); // Mean gravel deposit ages.
     let _df = dep
         .iter()
         .filter(|x| x.facies == "DF")
         .map(|x| x.age + 50.0)
         .collect::<Vec<f64>>(); // Mean gravel deposit ages.
+
+    // let mut source_flux = df.to_vec();
+    // let mut flux = fg.to_vec();
+    // source_flux.append(&mut flux);
 
     // Set model parameters.
     let model = ModelManager::new()
@@ -25,13 +34,15 @@ fn main() {
         .obs_len(&fg) // Number of samples to collect from source.
         .period(40000.0) // Time period of individual simulations in years.
         .range(1000) // Seed for rng for reproducibility.
-        .thresholds(1.0, 450.0, 0.19, 0.13)
+        .thresholds(1.5, 300.0, 0.24, 0.15)
         .runs(200); // Number of times to run the model per sampling point.
+
 
 
     // Reservoir for gravel deposits.
     let fluvial = Fluvial::new()
-        .source_from_csv("data/debris_flow_transits_ks.csv")
+        // .source(df)
+        .source_from_csv("data/debris_flow_transits_kp.csv")
         .unwrap() // Set source as debris-flow deposits.
         // .capture_rate_gravels(0.1867216)
         .capture_rate_gravels(0.3285686)
@@ -40,5 +51,5 @@ fn main() {
         .turnover(&309.6175) // Set turnover period from the Kolmogorov-Smirnov test.
         .manager(&model.clone()); // Load model parameters.
 
-    fluvial.hit_rates_timed("/home/erik/output/gravel_hits_ks_1000.csv").unwrap();
+    fluvial.hit_rates_timed("/home/erik/output/gravel_hits_kp_1000.csv").unwrap();
 }

@@ -11,7 +11,7 @@ fn main() {
         .filter(|x| x.facies == "FG")
         .map(|x| x.age + 50.0)
         .collect(); // Mean gravel deposit ages.
-    let df = dep
+    let _df = dep
         .iter()
         .filter(|x| x.facies == "DF")
         .map(|x| x.age + 50.0)
@@ -21,9 +21,9 @@ fn main() {
     let model = ModelManager::new()
         .index(0..20000) // Range of years to fit transit time probabilities.
         .obs(&fg) // Observations to fit.
-        .obs_len(&df) // Number of samples to collect from source.
+        .obs_len(&fg) // Number of samples to collect from source.
         .period(40000.0) // Time period of individual simulations in years.
-        .range(1003) // Seed for rng for reproducibility.
+        .range(1000) // Seed for rng for reproducibility.
         .runs(100000); // Number of times to run the model per sampling point.
 
 
@@ -39,5 +39,5 @@ fn main() {
         .manager(&model.clone()); // Load model parameters.
 
     let mut rec = fluvial.cherry_pick();
-    utils::record(&mut rec, "/home/erik/output/stereotype_gravels_ks2.csv").unwrap();
+    utils::record(&mut rec, "/home/erik/output/stereotype_gravels_ks_1000.csv").unwrap();
 }

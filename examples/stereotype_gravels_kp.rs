@@ -11,7 +11,7 @@ fn main() {
         .filter(|x| x.facies == "FG")
         .map(|x| x.age + 50.0)
         .collect(); // Mean gravel deposit ages.
-    let df = dep
+    let _df = dep
         .iter()
         .filter(|x| x.facies == "DF")
         .map(|x| x.age + 50.0)
@@ -21,21 +21,22 @@ fn main() {
     let model = ModelManager::new()
         .index(0..20000) // Range of years to fit transit time probabilities.
         .obs(&fg) // Observations to fit.
-        .obs_len(&df) // Number of samples to collect from source.
+        .obs_len(&fg) // Number of samples to collect from source.
         .period(40000.0) // Time period of individual simulations in years.
-        .range(1001) // Seed for rng for reproducibility.
+        .range(1010) // Seed for rng for reproducibility.
         .runs(100000); // Number of times to run the model per sampling point.
 
 
     // Reservoir for gravel deposits.
     let fluvial = Fluvial::new()
+        // .source(df)
         .source_from_csv("data/debris_flow_transits_kp.csv")
         .unwrap() // Set source as debris-flow deposits.
-        .capture_rate_gravels(0.03382391)
-        .storage_rate_gravels(0.1655014)
+        .capture_rate_gravels(0.09981258)
+        .storage_rate_gravels(0.10085645)
         .turnover(&191.0)
         .manager(&model.clone()); // Load model parameters.
 
     let mut rec = fluvial.cherry_pick();
-    utils::record(&mut rec, "/home/erik/output/stereotype_gravels_kp4.csv").unwrap();
+    utils::record(&mut rec, "/home/erik/output/stereotype_gravels_kp_1000.csv").unwrap();
 }
