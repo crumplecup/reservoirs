@@ -1,6 +1,5 @@
 use reservoirs::prelude::*;
 
-
 /// Produces a csv file of model fit to observed deposit ages.
 fn main() {
     // Load charcoal age data.
@@ -25,7 +24,6 @@ fn main() {
         .period(40000.0) // Time period of individual simulations in years.
         .range(1007) // Seed for rng for reproducibility.
         .runs(100000); // Number of times to run the model per sampling point.
-
 
     // Reservoir for gravel deposits.
     let fluvial = Fluvial::new()

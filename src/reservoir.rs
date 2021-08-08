@@ -1132,9 +1132,20 @@ impl Fluvial {
             .par_iter()
             .map(|x| self.clone().manager(x).sim())
             .collect::<Vec<Fluvial>>();
-        let fit = sims.par_iter().map(|s| s.clone().gof(&self.manager.obs)).collect::<Vec<Vec<f64>>>();
-        let min_ks = fit.iter().map(|f| f[4]).fold(f64::INFINITY, |a, b| a.min(b));
-        let min_id = fit.par_iter().enumerate().filter(|(_,val)| (val[4] - min_ks) < 0.0001).map(|(i, _)| i).collect::<Vec<usize>>();
+        let fit = sims
+            .par_iter()
+            .map(|s| s.clone().gof(&self.manager.obs))
+            .collect::<Vec<Vec<f64>>>();
+        let min_ks = fit
+            .iter()
+            .map(|f| f[4])
+            .fold(f64::INFINITY, |a, b| a.min(b));
+        let min_id = fit
+            .par_iter()
+            .enumerate()
+            .filter(|(_, val)| (val[4] - min_ks) < 0.0001)
+            .map(|(i, _)| i)
+            .collect::<Vec<usize>>();
         sims[min_id[0]].clone().mass
     }
 
@@ -1147,11 +1158,30 @@ impl Fluvial {
             .par_iter()
             .map(|x| self.clone().manager(x).sim())
             .collect::<Vec<Fluvial>>();
-        let fit = sims.par_iter().map(|s| s.clone().gof(&self.manager.obs)).collect::<Vec<Vec<f64>>>();
-        let hit_ad = fit.par_iter().filter(|f| f[0] <= self.manager.thresholds.ad).count() as f64 / self.manager.runs as f64;
-        let hit_ch = fit.par_iter().filter(|f| f[2] <= self.manager.thresholds.ch).count() as f64 / self.manager.runs as f64;
-        let hit_kp = fit.par_iter().filter(|f| f[3] <= self.manager.thresholds.kp).count() as f64 / self.manager.runs as f64;
-        let hit_ks = fit.par_iter().filter(|f| f[4] <= self.manager.thresholds.ks).count() as f64 / self.manager.runs as f64;
+        let fit = sims
+            .par_iter()
+            .map(|s| s.clone().gof(&self.manager.obs))
+            .collect::<Vec<Vec<f64>>>();
+        let hit_ad = fit
+            .par_iter()
+            .filter(|f| f[0] <= self.manager.thresholds.ad)
+            .count() as f64
+            / self.manager.runs as f64;
+        let hit_ch = fit
+            .par_iter()
+            .filter(|f| f[2] <= self.manager.thresholds.ch)
+            .count() as f64
+            / self.manager.runs as f64;
+        let hit_kp = fit
+            .par_iter()
+            .filter(|f| f[3] <= self.manager.thresholds.kp)
+            .count() as f64
+            / self.manager.runs as f64;
+        let hit_ks = fit
+            .par_iter()
+            .filter(|f| f[4] <= self.manager.thresholds.ks)
+            .count() as f64
+            / self.manager.runs as f64;
         vec![hit_ad, hit_ch, hit_kp, hit_ks]
     }
 
@@ -1193,10 +1223,7 @@ impl Fluvial {
     }
 
     /// Run fit_rates() for a set duration.
-    pub fn hit_rates_timed(
-        mut self,
-        path: &str,
-    ) -> Result<Vec<FluvialFit>, errors::ResError> {
+    pub fn hit_rates_timed(mut self, path: &str) -> Result<Vec<FluvialFit>, errors::ResError> {
         let seeder: rand::distributions::Uniform<u64> =
             rand::distributions::Uniform::new(0, 10000000);
 
@@ -1225,8 +1252,6 @@ impl Fluvial {
         }
         Ok(rec)
     }
-
-
 
     /// Fit number of runs to gof tests and return mean of each.
     pub fn fit(self, other: &[f64]) -> Vec<f64> {
@@ -2017,7 +2042,6 @@ impl Sample {
     }
 }
 
-
 /// Thresholds for statistical tests.
 #[derive(Clone, Debug)]
 pub struct Thresholds {
@@ -2030,12 +2054,7 @@ pub struct Thresholds {
 impl Thresholds {
     /// Builder for threshold struct.
     pub fn new(ad: f64, ch: f64, kp: f64, ks: f64) -> Thresholds {
-        Thresholds {
-            ad,
-            ch,
-            kp,
-            ks,
-        }
+        Thresholds { ad, ch, kp, ks }
     }
 }
 

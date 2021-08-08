@@ -36,13 +36,13 @@ fn main() {
     // Reservoir for gravel deposits.
     let fluvial = Fluvial::new()
         // .source(source_flux)
-        .source_from_csv("data/gravels_cdf_ad.csv")
+        .source_from_csv("data/gravels_cdf_ks.csv")
         .unwrap() // Set source as debris-flow deposits.
-        .capture_rate_gravels(0.175)
-        .storage_rate_gravels(0.108)
-        .turnover(&318.00)
+        .capture_rate_gravels(0.025)
+        .storage_rate_gravels(0.425)
+        .turnover(&208.00)
         .manager(&model); // Load model parameters.
 
     let mut rec = fluvial.cherry_pick();
-    utils::record(&mut rec, "/home/erik/output/stereotype_fines_ad_1000.csv").unwrap();
+    utils::record(&mut rec, "/home/erik/output/stereotype_fines_ks_1000.csv").unwrap();
 }

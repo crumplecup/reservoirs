@@ -1,5 +1,7 @@
 use crate::errors;
+use log::*;
 use rand::seq::IteratorRandom;
+use rayon::prelude::*;
 use realfft::RealFftPlanner;
 use rustfft::num_complex::Complex;
 use serde::Serialize;
@@ -230,7 +232,6 @@ pub fn chi_squared(obs: &[f64], other: &[f64]) -> f64 {
     difs.iter().sum::<f64>()
 }
 
-
 /// Convolve frequency distributions along an index of values.
 ///
 /// # Examples
@@ -312,6 +313,45 @@ pub fn convo(x: &[f64], y: &[f64], rng: i32) -> Vec<f64> {
         .iter()
         .map(|a| a / (rng + 1) as f64)
         .collect::<Vec<f64>>();
+    out_data
+}
+
+/// Less convoluted convolution.
+pub fn convo_vec(obs: Vec<Vec<f64>>, index: std::ops::Range<i32>) -> Vec<f64> {
+    let mut out = vec![Complex::new(0.0, 0.0); index.len()];
+    let mut real_planner = RealFftPlanner::<f64>::new();
+    info!("Constructing FftPlanner for fourier transforms.");
+    let r2c = real_planner.plan_fft_forward(index.len() + 1);
+    for ob in obs {
+        let cdf = cdf_rng(&ob, &index);
+        let mut pmf = pmf_from_cdf(&cdf);
+        let mut spectrum = r2c.make_output_vec();
+        info!("Forward transforming the pmf using fft.");
+        r2c.process(&mut pmf, &mut spectrum).unwrap();
+        info!("Summing transformed pmfs.");
+        out = out
+            .iter()
+            .zip(spectrum.iter())
+            .map(|(a, b)| a + b)
+            .collect::<Vec<Complex<f64>>>();
+    }
+    info!("Constructing FftPlanner for inverse fourier transforms.");
+    let c2r = real_planner.plan_fft_inverse(index.len() + 1);
+    info!("Inverse fourier transform using fft.");
+    let mut out_data = c2r.make_output_vec();
+    c2r.process(&mut out, &mut out_data).unwrap();
+    info!("Normalize output by dividing by length.");
+    out_data = out_data
+        .par_iter()
+        .map(|a| a / index.len() as f64)
+        .collect::<Vec<f64>>();
+    info!("Normalize output by dividing by sum of pmfs (having added several pmfs together).");
+    let sum_out = out_data.iter().fold(0.0, |acc, x| acc + *x);
+    out_data = out_data
+        .par_iter()
+        .map(|a| a / sum_out)
+        .collect::<Vec<f64>>();
+
     out_data
 }
 

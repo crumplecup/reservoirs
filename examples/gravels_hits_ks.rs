@@ -1,6 +1,5 @@
 use reservoirs::prelude::*;
 
-
 /// Produces a csv file of model fit to observed deposit ages using the Kolmogorov-Smirnov test.
 fn main() {
     // Load charcoal age data.
@@ -28,7 +27,6 @@ fn main() {
         .thresholds(1.0, 450.0, 0.19, 0.13)
         .runs(200); // Number of times to run the model per sampling point.
 
-
     // Reservoir for gravel deposits.
     let fluvial = Fluvial::new()
         .source_from_csv("data/debris_flow_transits_ks.csv")
@@ -40,5 +38,7 @@ fn main() {
         .turnover(&309.6175) // Set turnover period from the Kolmogorov-Smirnov test.
         .manager(&model.clone()); // Load model parameters.
 
-    fluvial.hit_rates_timed("/home/erik/output/gravel_hits_ks_1000.csv").unwrap();
+    fluvial
+        .hit_rates_timed("/home/erik/output/gravel_hits_ks_1000.csv")
+        .unwrap();
 }
