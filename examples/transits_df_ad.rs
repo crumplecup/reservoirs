@@ -1,10 +1,6 @@
 use reservoirs::prelude::*;
-/// Produces a csv file of model fit to observed deposit ages using the Kolmogorov-Smirnov test.
+/// Produces a csv file of model fit to observed deposit ages using the Anderson-Darling test.
 fn main() {
-    // Load charcoal age data.
-    // Change directory path for user, panics on invalid path
-    let iat = Sample::read("data/iat.csv").unwrap(); // Mean inherited ages of charcoal in deposits.
-    let _ia: Vec<f64> = iat.iter().map(|x| x.age).collect(); // Vector of inherited ages from all classes of deposits.
 
     // Set model parameters.
     let model = ModelManager::new()
@@ -22,6 +18,6 @@ fn main() {
         //.inherit(&ia) // Inherited ages of charcoal in debris-flow deposits.
         .model(&model); // Load model parameters.
 
-    let mut rec = debris_flows.transit_times();
-    utils::record(&mut rec, "/home/erik/output/transits_cdf_df_ad.csv").unwrap();
+    let mut rec = debris_flows.bulk_transits();
+    utils::record(&mut rec, "/home/erik/output/transits_df_ad.csv").unwrap();
 }

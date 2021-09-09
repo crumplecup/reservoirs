@@ -1864,7 +1864,7 @@ impl Reservoir {
         while om < self.model.period {
             info!("Generating a time for removal.");
             match self.output {
-                Some(x) => om += x.sample(&mut self.range) as f64,
+                Some(x) => om += x.sample(&mut self.model.range) as f64,
                 // TODO: Implement zero rates for input and output
                 None => continue,
             }
@@ -1872,7 +1872,7 @@ impl Reservoir {
             while im < om {
                 info!("Generating inputs until time for removal.");
                 if let Some(x) = self.input {
-                    im += x.sample(&mut self.range) as f64;
+                    im += x.sample(&mut self.model.range) as f64;
                     mass.push(im);
                 }
             }
@@ -1883,7 +1883,7 @@ impl Reservoir {
                 info!("Selecting from inputs present before time of removal.");
                 if !mvec.is_empty() {
                     let rm =
-                        rand::distributions::Uniform::from(0..mvec.len()).sample(&mut self.range);
+                        rand::distributions::Uniform::from(0..mvec.len()).sample(&mut self.model.range);
                     flux.push(mass[rm]);
                     mass.remove(rm);
                 }
@@ -1896,7 +1896,7 @@ impl Reservoir {
             let ln = x.len();
             mass = mass
                 .iter()
-                .map(|z| z + x[rand::distributions::Uniform::from(0..ln).sample(&mut self.range)])
+                .map(|z| z + x[rand::distributions::Uniform::from(0..ln).sample(&mut self.model.range)])
                 .collect();
             // flux = flux.iter().map(|z| z + x[rand::distributions::Uniform::from(0..ln).sample(&mut self.range)]).collect();
         }
@@ -1960,6 +1960,23 @@ impl Reservoir {
         }
 
         low.mass
+    }
+
+    /// Returns raw transit times based on model parameters.
+    pub fn bulk_transits(self) -> Vec<f64> {
+        let res = self
+            .clone()
+            .model
+            .seed_clones()
+            .iter()
+            .map(|x| self.clone().model(x).sim().mass)
+            .collect::<Vec<Vec<f64>>>();
+        let mut mass = Vec::new();
+        for mut r in res {
+            mass.append(&mut r);
+        }
+        mass
+
     }
 
     /// Return CDF of transit times based on model parameters.
