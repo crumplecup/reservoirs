@@ -1,7 +1,6 @@
 use reservoirs::prelude::*;
 /// Produces a csv file of model fit to observed deposit ages using the Anderson-Darling test.
 fn main() {
-
     // Set model parameters.
     let model = ModelManager::new()
         .index(0..20000)

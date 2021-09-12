@@ -26,7 +26,7 @@ impl Bbox {
 
 /// Generic function for plotting results on the fly.
 pub fn xy(x: &[f64], y: &[f64], path: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let bbox = Bbox::new(&x, &y);
+    let bbox = Bbox::new(x, y);
     let xy: Vec<(f64, f64)> = x.iter().cloned().zip(y.iter().cloned()).collect();
     let root = BitMapBackend::new(path, (640, 480)).into_drawing_area();
     root.fill(&WHITE)?;
@@ -187,9 +187,9 @@ pub fn whisker_for_facies(
     // And we can draw something in the drawing area
 
     chart.draw_series(vec![
-        Boxplot::new_vertical(SegmentValue::CenterOf(&"debris flows"), &df),
-        Boxplot::new_vertical(SegmentValue::CenterOf(&"fines"), &ff),
-        Boxplot::new_vertical(SegmentValue::CenterOf(&"gravels"), &fg),
+        Boxplot::new_vertical(SegmentValue::CenterOf(&"debris flows"), df),
+        Boxplot::new_vertical(SegmentValue::CenterOf(&"fines"), ff),
+        Boxplot::new_vertical(SegmentValue::CenterOf(&"gravels"), fg),
     ])?;
 
     chart

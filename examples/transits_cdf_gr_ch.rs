@@ -10,7 +10,6 @@ fn main() {
         .map(|x| x.age + 50.0)
         .collect(); // Mean gravel deposit ages.
 
-
     // Set model parameters.
     let model = ModelManager::new()
         .index(0..20000) // Range of years to fit transit time probabilities.
@@ -19,7 +18,6 @@ fn main() {
         .period(40000.0) // Time period of individual simulations in years.
         .range(1000) // Seed for rng for reproducibility.
         .runs(10000); // Number of times to run the model per sampling point.
-
 
     // Reservoir for gravel deposits.
     let fluvial = Fluvial::new()

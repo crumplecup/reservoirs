@@ -23,7 +23,6 @@ fn main() {
         .thresholds(1.8, 200.0, 0.33, 0.26)
         .storage_gravels(0.0..1.0); // Range of gravel storage rates to model.
 
-
     // Reservoir for gravel deposits.
     let fluvial = Fluvial::new()
         .source_from_csv("data/fines_source_ad.csv")

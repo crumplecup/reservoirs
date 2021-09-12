@@ -373,11 +373,6 @@ pub fn gof(obs: &[f64], other: &[f64]) -> Vec<f64> {
     let ada = (2.492 - 1.0) * (1.0 - (1.55 / k as f64)) + 1.0;
     // chi-squared pearsons test
     let ch = chi_squared(obs, other);
-    // let ch = cdf
-    //     .iter()
-    //     .filter(|x| x.0 > 0.0)
-    //     .map(|x| f64::powi(x.1 - x.0, 2) / x.0)
-    //     .sum::<f64>();
     // kuiper test
     let kp1 = cdf.iter().map(|x| x.0 - x.1).fold(0.0, f64::max);
     let kp2 = cdf.iter().map(|x| x.1 - x.0).fold(0.0, f64::max);
@@ -582,5 +577,22 @@ pub fn record<T: Serialize>(rec: &mut Vec<T>, path: &str) -> Result<(), errors::
         wtr.serialize(i)?;
     }
     wtr.flush()?;
+    Ok(())
+}
+
+/// Timed wrapper for functions.
+pub fn timed<T: Serialize>(
+    f: fn() -> Result<Vec<T>, errors::ResError>,
+    path: &str,
+    dur: u64,
+) -> Result<(), errors::ResError> {
+    let mut rec = Vec::new();
+    let dur = std::time::Duration::new(60 * 60 * dur, 0);
+    let now = std::time::SystemTime::now();
+    while std::time::SystemTime::now() < now + dur {
+        let res = f()?;
+        rec.push(res);
+        record(&mut rec, path)?;
+    }
     Ok(())
 }

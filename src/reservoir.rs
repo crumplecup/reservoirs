@@ -83,6 +83,56 @@ impl Gof {
     }
 }
 
+/// Holder struct for goodness-of-fit statistics.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ReservoirFit {
+    rate: f64,
+    period: f64,
+    ad: f64,
+    ch: f64,
+    kp: f64,
+    ks: f64,
+    n: f64,
+}
+
+impl ReservoirFit {
+    /// Convert csv record to Gof struct.
+    pub fn read(path: &str) -> Result<Vec<ReservoirFit>, errors::ResError> {
+        let mut fit = Vec::new();
+        let var = std::fs::File::open(path)?;
+        let mut rdr = csv::Reader::from_reader(var);
+        for result in rdr.records() {
+            let row = result?;
+            let row: ReservoirFit = row.deserialize(None)?;
+            fit.push(row);
+        }
+        Ok(fit)
+    }
+
+    /// Write statistical results to csv file.
+    pub fn record(rec: &mut Vec<ReservoirFit>, title: &str) -> Result<(), errors::ResError> {
+        let mut wtr = csv::Writer::from_path(title)?;
+        for i in rec {
+            wtr.serialize(i)?;
+        }
+        wtr.flush()?;
+        Ok(())
+    }
+
+    /// Get the values associated with fields of the struct.
+    pub fn values(&self) -> (f64, f64, f64, f64, f64, f64, f64) {
+        (
+            self.rate,
+            self.period,
+            self.ad,
+            self.ch,
+            self.kp,
+            self.ks,
+            self.n,
+        )
+    }
+}
+
 /// Holds parameters for bootstrapping confidence intervals of reservoir models.
 #[derive(Clone, Debug)]
 pub struct Bootstrap {
@@ -139,7 +189,7 @@ impl Bootstrap {
         let rec_path = format!("{}{}", path, "rec.csv");
         while std::time::SystemTime::now() < now + dur {
             let mut gof = Vec::new();
-            let boot = utils::bootstrap(&obs);
+            let boot = utils::bootstrap(obs);
             while gof.len() < (self.bins * self.samples) {
                 let mut new = self.model.steady(rate.clone(), &boot);
                 gof.append(&mut new);
@@ -331,7 +381,7 @@ impl Model {
                 ),
             );
         }
-        let gof: Vec<Fits> = fits.par_iter().map(|x| x.clone().fit_rate(&obs)).collect();
+        let gof: Vec<Fits> = fits.par_iter().map(|x| x.clone().fit_rate(obs)).collect();
         let mut gofs = Vec::with_capacity(self.batch);
         for i in 0..self.batch {
             gofs.push(Gof {
@@ -393,7 +443,7 @@ impl Model {
             res.push(self.reservoir.clone().range(seed));
         }
         res = res.par_iter().cloned().map(|x| x.sim()).collect();
-        let fits: Vec<Fit> = res.par_iter().cloned().map(|x| x.gof(other)).collect();
+        let fits: Vec<Fit> = res.par_iter().cloned().map(|x| x.gof1(other)).collect();
         let ads: Vec<f64> = fits.iter().map(|x| x.ad).collect();
         let ad = utils::median(&ads);
         let adas: Vec<f64> = fits.iter().map(|x| x.ada).collect();
@@ -704,7 +754,7 @@ impl Model {
                 ),
             );
         }
-        let gof: Vec<Fits> = fits.par_iter().map(|x| x.clone().fit_rate(&obs)).collect();
+        let gof: Vec<Fits> = fits.par_iter().map(|x| x.clone().fit_rate(obs)).collect();
         let mut gofs = Vec::with_capacity(self.batch);
         for i in 0..self.batch {
             gofs.push(Gof {
@@ -795,7 +845,7 @@ impl Model {
         let cdf = utils::cdf_bin(&rec, bins); // subsample vector to length bins
 
         // TODO:  parallelize
-        let gof: Vec<Fit> = res.par_iter().cloned().map(|x| x.gof(&cdf)).collect(); // ks and kp values
+        let gof: Vec<Fit> = res.par_iter().cloned().map(|x| x.gof1(&cdf)).collect(); // ks and kp values
         let ks: Vec<f64> = gof.par_iter().cloned().map(|x| x.ks).collect(); // clip to just ks values
         let mut least = 1.0; // test for lowest fit (set to high value)
         let mut low = Reservoir::new(); // initialize variable to hold lowest fit
@@ -913,7 +963,9 @@ pub struct ModelManager {
     obs: Vec<f64>,
     obs_len: usize,
     period: f64,
+    periods: std::ops::Range<f64>,
     range: rand::rngs::StdRng,
+    rates: std::ops::Range<f64>,
     runs: usize,
     source_runs: usize,
     storage_gravels: std::ops::Range<f64>,
@@ -936,7 +988,9 @@ impl ModelManager {
             obs: Vec::new(),
             obs_len: 0,
             period: 100.0,
+            periods: 100.0..1000.0,
             range: rand::SeedableRng::seed_from_u64(777),
+            rates: 0.01..2.0,
             runs: 10,
             source_runs: 10,
             storage_fines: 0.0..1.0,
@@ -944,6 +998,12 @@ impl ModelManager {
             thresholds: Thresholds::new(0.0, 0.0, 0.0, 0.0),
             turnover: 200.0..300.0,
         }
+    }
+
+    /// Set the batch size for runs.
+    pub fn batch(mut self, batch: usize) -> Self {
+        self.batch = batch;
+        self
     }
 
     /// Set capture rate of fines.
@@ -976,18 +1036,6 @@ impl ModelManager {
         self
     }
 
-    /// Set model seed.
-    pub fn range(mut self, seed: u64) -> Self {
-        self.range = rand::SeedableRng::seed_from_u64(seed);
-        self
-    }
-
-    /// Set number of model runs.
-    pub fn runs(mut self, runs: usize) -> Self {
-        self.runs = runs;
-        self
-    }
-
     /// Set period length of model runs.
     pub fn obs(mut self, obs: &[f64]) -> Self {
         self.obs = obs.to_owned();
@@ -1003,6 +1051,30 @@ impl ModelManager {
     /// Set period length of model runs.
     pub fn period(mut self, period: f64) -> Self {
         self.period = period;
+        self
+    }
+
+    /// Set the period range for Reservoir::fit_rates().
+    pub fn periods(mut self, periods: std::ops::Range<f64>) -> Self {
+        self.periods = periods;
+        self
+    }
+
+    /// Set model seed.
+    pub fn range(mut self, seed: u64) -> Self {
+        self.range = rand::SeedableRng::seed_from_u64(seed);
+        self
+    }
+
+    /// Set the range of input/output rates for Reservoir::fit_rates().
+    pub fn rates(mut self, rates: std::ops::Range<f64>) -> Self {
+        self.rates = rates;
+        self
+    }
+
+    /// Set number of model runs.
+    pub fn runs(mut self, runs: usize) -> Self {
+        self.runs = runs;
         self
     }
 
@@ -1401,7 +1473,7 @@ impl Fluvial {
                 .manager
                 .range(seeder.sample(&mut self.manager.range))
                 .clone();
-            res.push(fit.fit_rate(&other));
+            res.push(fit.fit_rate(other));
         }
         res
     }
@@ -1651,6 +1723,147 @@ pub struct Reservoir {
 }
 
 impl Reservoir {
+    /// Fit reservoir to observed record.
+    ///
+    /// ```{rust}
+    /// use reservoirs::prelude::*;
+    /// fn main() -> Result<(), ResError> {
+    ///
+    /// // mean expected deposit age and inherited age by facies
+    /// let dep = Sample::read("data/dep.csv")?;
+    /// let iat = Sample::read("data/iat.csv")?;
+    ///
+    /// // subset mean ages of debris flows
+    /// let df: Vec<f64> = dep.iter()
+    ///     .filter(|x| x.facies == "DF")
+    ///     .map(|x| x.age)
+    ///     .collect();
+    ///
+    /// // subset inherited ages
+    /// let ia: Vec<f64> = iat.iter()
+    ///     .map(|x| x.age)
+    ///     .collect();
+    /// }
+    /// ```
+    pub fn fit_reservoir(self) -> Vec<f64> {
+        let reservoirs = self
+            .clone()
+            .model
+            .seed_clones()
+            .par_iter()
+            .map(|x| self.clone().model(x).sim())
+            .collect::<Vec<Reservoir>>();
+        let fits = reservoirs
+            .par_iter()
+            .map(|x| utils::gof(&x.mass, &self.model.obs))
+            .collect::<Vec<Vec<f64>>>();
+        let ad = fits.par_iter().map(|x| x[0]).collect::<Vec<f64>>();
+        let ch = fits.par_iter().map(|x| x[2]).collect::<Vec<f64>>();
+        let kp = fits.par_iter().map(|x| x[3]).collect::<Vec<f64>>();
+        let ks = fits.par_iter().map(|x| x[4]).collect::<Vec<f64>>();
+        let ns = reservoirs
+            .par_iter()
+            .map(|x| x.mass.len() as f64)
+            .collect::<Vec<f64>>();
+        vec![
+            utils::mean(&ad),
+            utils::mean(&ch),
+            utils::mean(&kp),
+            utils::mean(&ks),
+            utils::mean(&ns),
+        ]
+    }
+
+    /// Fit reservoirs to observed record.
+    pub fn fit_reservoirs(mut self) -> Result<Vec<ReservoirFit>, errors::ResError> {
+        let seeder: rand::distributions::Uniform<u64> =
+            rand::distributions::Uniform::new(0, 10000000);
+        let seeds = seeder
+            .sample_iter(&mut self.model.range)
+            .take(self.model.batch)
+            .collect::<Vec<u64>>();
+        let rates = rand::distributions::Uniform::from(self.model.rates.clone())
+            .sample_iter(&mut self.model.range)
+            .take(self.model.batch)
+            .collect::<Vec<f64>>();
+        let periods = rand::distributions::Uniform::from(self.model.periods.clone())
+            .sample_iter(&mut self.model.range)
+            .take(self.model.batch)
+            .collect::<Vec<f64>>();
+
+        let mut reservoirs = Vec::with_capacity(self.model.batch);
+        for i in 0..self.model.batch {
+            let model = self.model.clone().period(periods[i]).range(seeds[i]);
+            reservoirs.push(self
+                .clone()
+                .input(&rates[i])?
+                .output(&rates[i])?
+                .model(&model));
+        }
+
+        let fits = reservoirs
+            .iter()
+            .map(|x| x.clone().fit_reservoir())
+            .collect::<Vec<Vec<f64>>>();
+        let ad = fits.iter().map(|x| x[0]).collect::<Vec<f64>>();
+        let ch = fits.iter().map(|x| x[1]).collect::<Vec<f64>>();
+        let kp = fits.iter().map(|x| x[2]).collect::<Vec<f64>>();
+        let ks = fits.iter().map(|x| x[3]).collect::<Vec<f64>>();
+        let ns = fits.iter().map(|x| x[4]).collect::<Vec<f64>>();
+
+        let mut gofs = Vec::with_capacity(self.model.batch);
+        for i in 0..self.model.batch {
+            gofs.push(ReservoirFit {
+                rate: rates[i],
+                period: periods[i],
+                ad: ad[i],
+                ch: ch[i],
+                kp: kp[i],
+                ks: ks[i],
+                n: ns[i],
+            });
+        }
+
+        Ok(gofs)
+    }
+
+
+    /// Timed fit of reservoirs to observed record.
+    pub fn fit_reservoirs_timed(mut self, path: &str) -> Result<Vec<ReservoirFit>, errors::ResError> {
+        let seeder: rand::distributions::Uniform<u64> =
+            rand::distributions::Uniform::new(0, 10000000);
+
+        let dur = std::time::Duration::new(60 * 60 * self.model.duration, 0);
+        let now = std::time::SystemTime::now();
+        let mut rec = Vec::new();
+        let exists = std::path::Path::new(path).exists();
+        match exists {
+            true => {
+                let mut stats: Vec<ReservoirFit> = ReservoirFit::read(path)?;
+                rec.append(&mut stats);
+            }
+            false => {}
+        }
+        while std::time::SystemTime::now() < now + dur {
+            let model = self
+                .model
+                .clone()
+                .range(seeder.sample(&mut self.model.range));
+            let fit = self.clone().model(&model);
+            let mut new = fit.fit_reservoirs()?;
+            {
+                rec.append(&mut new);
+            }
+            ReservoirFit::record(&mut rec, path)?;
+        }
+        Ok(rec)
+    }
+
+    /// Goodness-of-fit test suite.
+    pub fn gof(self, other: &[f64]) -> Vec<f64> {
+        utils::gof(&self.mass, other)
+    }
+
     /// Compare the accumulated mass in a reservoir to another record.
     /// Produces two goodness-of-fit statistics in a tuple:
     /// the K-S statistic and the Kuiper statistic, respectively.
@@ -1671,7 +1884,7 @@ impl Reservoir {
     ///     Ok(())
     /// }
     /// ```
-    pub fn gof(&self, other: &[f64]) -> Fit {
+    pub fn gof1(&self, other: &[f64]) -> Fit {
         let cdf = utils::cdf_dual(&self.mass, other);
         let ad = utils::ad_dual(&self.mass, other);
         // anderson-darling test
@@ -1882,8 +2095,8 @@ impl Reservoir {
                 let mvec: Vec<f64> = mass.par_iter().cloned().filter(|x| x <= &om).collect();
                 info!("Selecting from inputs present before time of removal.");
                 if !mvec.is_empty() {
-                    let rm =
-                        rand::distributions::Uniform::from(0..mvec.len()).sample(&mut self.model.range);
+                    let rm = rand::distributions::Uniform::from(0..mvec.len())
+                        .sample(&mut self.model.range);
                     flux.push(mass[rm]);
                     mass.remove(rm);
                 }
@@ -1896,7 +2109,9 @@ impl Reservoir {
             let ln = x.len();
             mass = mass
                 .iter()
-                .map(|z| z + x[rand::distributions::Uniform::from(0..ln).sample(&mut self.model.range)])
+                .map(|z| {
+                    z + x[rand::distributions::Uniform::from(0..ln).sample(&mut self.model.range)]
+                })
                 .collect();
             // flux = flux.iter().map(|z| z + x[rand::distributions::Uniform::from(0..ln).sample(&mut self.range)]).collect();
         }
@@ -1945,7 +2160,7 @@ impl Reservoir {
         let gof = res
             .iter()
             .cloned()
-            .map(|x| x.gof(&rec))
+            .map(|x| x.gof1(&rec))
             .collect::<Vec<Fit>>(); // ks and kp values
         let ks = gof.iter().cloned().map(|x| x.ks).collect::<Vec<f64>>(); // clip to just ks values
         let mut least = 1.0; // test for lowest fit (set to high value)
@@ -1976,7 +2191,6 @@ impl Reservoir {
             mass.append(&mut r);
         }
         mass
-
     }
 
     /// Return CDF of transit times based on model parameters.
@@ -2114,9 +2328,9 @@ impl Record for Vec<Gof> {
         ord.sort_by(|x, y| x.input.partial_cmp(&y.input).unwrap());
         let chunk_ln = (ord.len() as f64 / bins as f64).round() as usize;
         let rates: Vec<f64> = ord.iter().map(|x| x.input).collect();
-        let rates: Vec<f64> = rates.chunks(chunk_ln).map(|x| utils::mean(&x)).collect();
+        let rates: Vec<f64> = rates.chunks(chunk_ln).map(|x| utils::mean(x)).collect();
         let fits: Vec<f64> = ord.iter().map(|x| x.ks).collect();
-        let fits: Vec<f64> = fits.chunks(chunk_ln).map(|x| utils::mean(&x)).collect();
+        let fits: Vec<f64> = fits.chunks(chunk_ln).map(|x| utils::mean(x)).collect();
         (rates, fits)
     }
 }
