@@ -1724,27 +1724,6 @@ pub struct Reservoir {
 
 impl Reservoir {
     /// Fit reservoir to observed record.
-    ///
-    /// ```{rust}
-    /// use reservoirs::prelude::*;
-    /// fn main() -> Result<(), ResError> {
-    ///
-    /// // mean expected deposit age and inherited age by facies
-    /// let dep = Sample::read("data/dep.csv")?;
-    /// let iat = Sample::read("data/iat.csv")?;
-    ///
-    /// // subset mean ages of debris flows
-    /// let df: Vec<f64> = dep.iter()
-    ///     .filter(|x| x.facies == "DF")
-    ///     .map(|x| x.age)
-    ///     .collect();
-    ///
-    /// // subset inherited ages
-    /// let ia: Vec<f64> = iat.iter()
-    ///     .map(|x| x.age)
-    ///     .collect();
-    /// }
-    /// ```
     pub fn fit_reservoir(self) -> Vec<f64> {
         let reservoirs = self
             .clone()
