@@ -1,4 +1,4 @@
-//! Structs and methods for Bolin & Rodhes reservoir models.
+//! Structs and methods for Bolin & Rodhe reservoir models.
 use crate::errors;
 use crate::plot;
 use crate::utils;
@@ -1773,11 +1773,12 @@ impl Reservoir {
         let mut reservoirs = Vec::with_capacity(self.model.batch);
         for i in 0..self.model.batch {
             let model = self.model.clone().period(periods[i]).range(seeds[i]);
-            reservoirs.push(self
-                .clone()
-                .input(&rates[i])?
-                .output(&rates[i])?
-                .model(&model));
+            reservoirs.push(
+                self.clone()
+                    .input(&rates[i])?
+                    .output(&rates[i])?
+                    .model(&model),
+            );
         }
 
         let fits = reservoirs
@@ -1806,9 +1807,11 @@ impl Reservoir {
         Ok(gofs)
     }
 
-
     /// Timed fit of reservoirs to observed record.
-    pub fn fit_reservoirs_timed(mut self, path: &str) -> Result<Vec<ReservoirFit>, errors::ResError> {
+    pub fn fit_reservoirs_timed(
+        mut self,
+        path: &str,
+    ) -> Result<Vec<ReservoirFit>, errors::ResError> {
         let seeder: rand::distributions::Uniform<u64> =
             rand::distributions::Uniform::new(0, 10000000);
 

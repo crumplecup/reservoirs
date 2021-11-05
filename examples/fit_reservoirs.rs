@@ -22,15 +22,15 @@ fn main() -> Result<(), ResError> {
         .obs(&df) // Observations to fit.
         .obs_len(&df) // Number of samples to collect from source.
         .period(40000.0) // Time period of individual simulations in years.
-        .periods(1000.0..200000.0) // Range of periods to fit.
-        .range(1000) // Seed for rng for reproducibility.
+        .periods(1000.0..1000000.0) // Range of periods to fit.
+        .range(1004) // Seed for rng for reproducibility.
         .rates(0.01..2.0) // Range of rates to fit.
         .runs(100); // Number of times to run the model per sampling point.
 
     Reservoir::new()
         .model(&model)
         .inherit(&ia)
-        .fit_reservoirs_timed("/home/erik/output/resfit_1000.csv")?;
+        .fit_reservoirs_timed("/home/erik/output/resfit_1004.csv")?;
 
     Ok(())
 }
